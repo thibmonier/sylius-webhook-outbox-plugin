@@ -99,9 +99,12 @@ final class PayloadSchemaTest extends KernelTestCase
     {
         $schema = json_decode((string) file_get_contents(sprintf('%s/../../docs/schemas/%s.json', __DIR__, $name)), true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($schema);
+        $named = [];
+        foreach ($schema as $key => $value) {
+            $named[(string) $key] = $value;
+        }
 
-        /** @var array<string, mixed> $schema */
-        return $schema;
+        return $named;
     }
 
     /** @param array<string, mixed> $schema */
