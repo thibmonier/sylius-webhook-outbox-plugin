@@ -1,0 +1,89 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/thibmonier/sylius-webhook-outbox-plugin/blob/main/docs/schemas/product_variant.stock_changed.v1.json",
+    "title": "data of product_variant.stock_changed (version 1): every variant changed in one flush",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "variants"
+    ],
+    "properties": {
+        "variants": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "id",
+                    "code",
+                    "product_code",
+                    "admin_url",
+                    "tracked",
+                    "on_hand",
+                    "on_hold",
+                    "available",
+                    "previous"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "product_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "admin_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tracked": {
+                        "type": "boolean"
+                    },
+                    "on_hand": {
+                        "type": "integer"
+                    },
+                    "on_hold": {
+                        "type": "integer"
+                    },
+                    "available": {
+                        "type": "integer",
+                        "description": "on_hand - on_hold"
+                    },
+                    "previous": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "on_hand",
+                            "on_hold"
+                        ],
+                        "properties": {
+                            "on_hand": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "on_hold": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

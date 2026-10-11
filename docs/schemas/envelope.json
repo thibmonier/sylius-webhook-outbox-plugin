@@ -1,0 +1,47 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/thibmonier/sylius-webhook-outbox-plugin/blob/main/docs/schemas/envelope.json",
+    "title": "Webhook envelope (request body of every delivery)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "id",
+        "type",
+        "version",
+        "timestamp",
+        "channel",
+        "data"
+    ],
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUIDv7, equal to the webhook-id header; identical for retries and replays"
+        },
+        "type": {
+            "type": "string",
+            "examples": [
+                "order.placed"
+            ]
+        },
+        "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Version of the data DTO of this type"
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the event occurred, UTC"
+        },
+        "channel": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "data": {
+            "type": "object"
+        }
+    }
+}

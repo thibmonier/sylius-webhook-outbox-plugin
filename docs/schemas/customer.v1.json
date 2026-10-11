@@ -1,0 +1,105 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/thibmonier/sylius-webhook-outbox-plugin/blob/main/docs/schemas/customer.v1.json",
+    "title": "data of customer.created and customer.updated (version 1)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "id",
+        "admin_url",
+        "email",
+        "first_name",
+        "last_name",
+        "phone_number",
+        "gender",
+        "birthday",
+        "group",
+        "subscribed_to_newsletter",
+        "has_account",
+        "created_at"
+    ],
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "admin_url": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "email": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "first_name": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "last_name": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "phone_number": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "gender": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "birthday": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "format": "date"
+        },
+        "group": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "subscribed_to_newsletter": {
+            "type": "boolean"
+        },
+        "has_account": {
+            "type": "boolean"
+        },
+        "created_at": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "format": "date-time"
+        },
+        "changed_fields": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "phone_number",
+                    "gender",
+                    "birthday",
+                    "group",
+                    "subscribed_to_newsletter"
+                ]
+            },
+            "description": "customer.updated only"
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/thibmonier/sylius-webhook-outbox-plugin/blob/main/docs/schemas/webhook.ping.v1.json",
+    "title": "data of webhook.ping (version 1)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "endpoint_id",
+        "endpoint_name",
+        "message"
+    ],
+    "properties": {
+        "endpoint_id": {
+            "type": "integer"
+        },
+        "endpoint_name": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "message": {
+            "type": "string"
+        }
+    }
+}
