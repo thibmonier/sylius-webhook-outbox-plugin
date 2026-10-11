@@ -1,0 +1,9 @@
+tmonier_webhook:
+    endpoint:
+        url:
+            invalid: "To nie jest prawidłowy adres URL endpointu."
+            https_only: "Adres URL endpointu musi używać https."
+            http_or_https: "Adres URL endpointu musi używać http lub https."
+            no_credentials: "Nie umieszczaj nazwy użytkownika ani hasła w adresie URL: żądania są podpisywane."
+        event_types:
+            min: "Wybierz co najmniej jedno zdarzenie."

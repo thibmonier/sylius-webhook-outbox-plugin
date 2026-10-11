@@ -1,0 +1,9 @@
+tmonier_webhook:
+    invalid_csrf_token: "Ungültiges Sicherheitstoken, bitte erneut versuchen."
+    ping_queued: "Ping eingereiht: Der Worker (tmonier:webhook:dispatch) sendet ihn."
+    cannot_retry: "Nur ausstehende oder fehlgeschlagene Zustellungen können erneut versucht werden."
+    retry_scheduled: "Die Zustellung ist jetzt fällig: Der Worker sendet sie beim nächsten Lauf."
+    cannot_replay: "Nur zugestellte oder endgültig fehlgeschlagene Zustellungen können erneut gesendet werden."
+    cannot_replay_anonymized: "Dieses Ereignis wurde anonymisiert: Es kann nicht erneut gesendet werden."
+    replay_scheduled: "Erneutes Senden mit derselben Webhook-ID eingereiht."
+    bulk_replay_done: "%replayed% Zustellung(en) zum erneuten Senden eingereiht, %skipped% übersprungen (ausstehend, fehlgeschlagen oder anonymisiert)."

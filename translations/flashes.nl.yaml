@@ -1,0 +1,9 @@
+tmonier_webhook:
+    invalid_csrf_token: "Ongeldig beveiligingstoken, probeer het opnieuw."
+    ping_queued: "Ping in de wachtrij: de worker (tmonier:webhook:dispatch) verzendt hem."
+    cannot_retry: "Alleen leveringen in afwachting of mislukte leveringen kunnen opnieuw worden geprobeerd."
+    retry_scheduled: "De levering is nu verschuldigd: de worker verzendt ze bij de volgende run."
+    cannot_replay: "Alleen afgeleverde of definitief mislukte leveringen kunnen opnieuw worden verzonden."
+    cannot_replay_anonymized: "Deze gebeurtenis is geanonimiseerd: ze kan niet opnieuw worden verzonden."
+    replay_scheduled: "Herhaling in de wachtrij met dezelfde webhook-id."
+    bulk_replay_done: "%replayed% levering(en) in de wachtrij voor herhaling, %skipped% overgeslagen (in afwachting, mislukt of geanonimiseerd)."

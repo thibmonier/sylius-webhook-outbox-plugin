@@ -1,2 +1,86 @@
 sylius_twig_hooks:
-    hooks: {}
+    hooks:
+        # Endpoint forms (generic CRUD templates, custom fields layout)
+        'tmonier_webhook.admin.webhook_endpoint.create.content.form.sections.general':
+            default:
+                enabled: false
+            fields:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/form/fields.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_endpoint.update.content.form.sections.general':
+            default:
+                enabled: false
+            fields:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/form/fields.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_endpoint.update.content':
+            secret:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/form/secret_card.html.twig'
+                priority: 150
+
+        # "Copy your secret" page (answer to the creation / regeneration POST)
+        'tmonier_webhook.admin.webhook_endpoint.secret':
+            sidebar:
+                template: '@SyliusAdmin/shared/crud/common/sidebar.html.twig'
+                priority: 200
+            navbar:
+                template: '@SyliusAdmin/shared/crud/common/navbar.html.twig'
+                priority: 100
+            content:
+                template: '@SyliusAdmin/shared/crud/common/content.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_endpoint.secret.content':
+            header:
+                template: '@SyliusAdmin/shared/crud/common/content/header.html.twig'
+                priority: 100
+            sections:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/secret/sections.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_endpoint.secret.content.header':
+            breadcrumbs:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/secret/breadcrumbs.html.twig'
+                priority: 100
+            title_block:
+                template: '@SyliusAdmin/shared/crud/common/content/header/title_block.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_endpoint.secret.content.header.title_block':
+            title:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/secret/title.html.twig'
+                priority: 0
+
+        # Delivery page
+        'tmonier_webhook.admin.webhook_delivery.show.content.header':
+            breadcrumbs:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/breadcrumbs.html.twig'
+
+        'tmonier_webhook.admin.webhook_delivery.show.content.header.title_block':
+            title:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/title.html.twig'
+            actions:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/actions.html.twig'
+
+        'tmonier_webhook.admin.webhook_delivery.show.content':
+            sections:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/sections.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_delivery.show.content.sections#left':
+            details:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/details.html.twig'
+                priority: 0
+
+        'tmonier_webhook.admin.webhook_delivery.show.content.sections#right':
+            response:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/response.html.twig'
+                priority: 200
+            attempts:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/attempts.html.twig'
+                priority: 100
+            request:
+                template: '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/show/request.html.twig'
+                priority: 0

@@ -1,0 +1,17 @@
+{#
+    Item action posting a form with a CSRF token: options.route (route with {id}),
+    options.token ("endpoint" or "delivery"), options.confirm (optional translation key),
+    options.check (optional boolean method of the row, e.g. canBeReplayed).
+#}
+{% set visible = options.check is not defined or attribute(data, options.check) %}
+{% if visible %}
+    {% set token_id = options.token == 'endpoint' ? tmonier_webhook_endpoint_token_id(data.id) : tmonier_webhook_delivery_token_id(data.id) %}
+    <form action="{{ path(options.route, {'id': data.id}) }}" method="post" class="d-inline" {{ sylius_test_html_attribute('tmonier-webhook-action', action.name) }}
+        {% if options.confirm is defined %}onsubmit="return confirm({{ options.confirm|trans|json_encode|e('html_attr') }});"{% endif %}>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token(token_id) }}">
+        <button type="submit" class="btn {{ options.class|default('') }}">
+            {% if action.icon %}{{ ux_icon(action.icon, {'class': 'icon'}) }}{% endif %}
+            {{ action.label|trans }}
+        </button>
+    </form>
+{% endif %}

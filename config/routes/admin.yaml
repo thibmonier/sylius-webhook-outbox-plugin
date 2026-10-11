@@ -1,1 +1,92 @@
-{}
+tmonier_webhook_admin_webhook_endpoint:
+    resource: |
+        alias: tmonier_webhook.webhook_endpoint
+        section: admin
+        path: webhooks/endpoints
+        templates: "@SyliusAdmin\\shared\\crud"
+        except: ['show']
+        redirect: update
+        grid: tmonier_webhook_admin_webhook_endpoint
+        permission: true
+        vars:
+            all:
+                hook_prefix: tmonier_webhook.admin.webhook_endpoint
+    type: sylius.resource
+
+tmonier_webhook_admin_webhook_endpoint_regenerate_secret:
+    path: /webhooks/endpoints/{id}/regenerate-secret
+    methods: [POST]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: tmonier_webhook.controller.admin.webhook_endpoint::regenerateSecretAction
+
+tmonier_webhook_admin_webhook_endpoint_ping:
+    path: /webhooks/endpoints/{id}/ping
+    methods: [POST]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: tmonier_webhook.controller.admin.webhook_endpoint::pingAction
+
+tmonier_webhook_admin_webhook_delivery_index:
+    path: /webhooks/deliveries
+    methods: [GET]
+    defaults:
+        _controller: tmonier_webhook.controller.webhook_delivery::indexAction
+        _sylius:
+            section: admin
+            permission: true
+            template: "@SyliusAdmin/shared/crud/index.html.twig"
+            grid: tmonier_webhook_admin_webhook_delivery
+            vars:
+                hook_prefix: tmonier_webhook.admin.webhook_delivery
+
+tmonier_webhook_admin_webhook_delivery_dead_letters:
+    path: /webhooks/dead-letters
+    methods: [GET]
+    defaults:
+        _controller: tmonier_webhook.controller.webhook_delivery::indexAction
+        _sylius:
+            section: admin
+            permission: true
+            template: "@SyliusAdmin/shared/crud/index.html.twig"
+            grid: tmonier_webhook_admin_dead_letter
+            vars:
+                hook_prefix: tmonier_webhook.admin.dead_letter
+
+tmonier_webhook_admin_webhook_delivery_show:
+    path: /webhooks/deliveries/{id}
+    methods: [GET]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: tmonier_webhook.controller.webhook_delivery::showAction
+        _sylius:
+            section: admin
+            permission: true
+            template: "@SyliusAdmin/shared/crud/show.html.twig"
+            vars:
+                hook_prefix: tmonier_webhook.admin.webhook_delivery
+
+tmonier_webhook_admin_webhook_delivery_retry:
+    path: /webhooks/deliveries/{id}/retry
+    methods: [POST]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: tmonier_webhook.controller.admin.webhook_delivery::retryAction
+
+tmonier_webhook_admin_webhook_delivery_replay:
+    path: /webhooks/deliveries/{id}/replay
+    methods: [POST]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: tmonier_webhook.controller.admin.webhook_delivery::replayAction
+
+tmonier_webhook_admin_webhook_delivery_bulk_replay:
+    path: /webhooks/deliveries/bulk-replay
+    methods: [POST]
+    defaults:
+        _controller: tmonier_webhook.controller.admin.webhook_delivery::bulkReplayAction

@@ -5,6 +5,14 @@ declare(strict_types=1);
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use Symfony\Component\HttpClient\HttpClient;
+use Tmonier\SyliusWebhookOutboxPlugin\Controller\Admin\SecretRevealer;
+use Tmonier\SyliusWebhookOutboxPlugin\Controller\Admin\WebhookDeliveryController;
+use Tmonier\SyliusWebhookOutboxPlugin\Controller\Admin\WebhookEndpointController;
+use Tmonier\SyliusWebhookOutboxPlugin\EventListener\EndpointSecretListener;
+use Tmonier\SyliusWebhookOutboxPlugin\Form\Type\WebhookEndpointType;
+use Tmonier\SyliusWebhookOutboxPlugin\Menu\AdminMenuListener;
+use Tmonier\SyliusWebhookOutboxPlugin\Twig\WebhookExtension;
+use Tmonier\SyliusWebhookOutboxPlugin\Validator\EndpointUrlValidator;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\Detector\CustomerEventDetector;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\Detector\OrderEventDetector;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\Detector\StockChangedDetector;
@@ -203,6 +211,70 @@ return static function (ContainerConfigurator $container): void {
             service('tmonier_webhook.payload_redactor'),
             service('clock'),
         ])
+    ;
+
+    // Admin
+    $services
+        ->set('tmonier_webhook.form.type.webhook_endpoint', WebhookEndpointType::class)
+        ->args([
+            param('tmonier_webhook.model.webhook_endpoint.class'),
+            ['sylius'],
+            service('tmonier_webhook.event_type_registry'),
+            service('sylius.repository.channel'),
+        ])
+        ->tag('form.type')
+    ;
+    $services
+        ->set('tmonier_webhook.validator.endpoint_url', EndpointUrlValidator::class)
+        ->args([service('tmonier_webhook.url_policy')])
+        ->tag('validator.constraint_validator', ['alias' => 'tmonier_webhook_endpoint_url'])
+    ;
+    $services
+        ->set('tmonier_webhook.secret_revealer', SecretRevealer::class)
+        ->args([service('twig')])
+    ;
+    $services
+        ->set('tmonier_webhook.listener.endpoint_secret', EndpointSecretListener::class)
+        ->args([
+            service('tmonier_webhook.secret_generator'),
+            service('tmonier_webhook.secret_revealer'),
+        ])
+        ->tag('kernel.event_listener', ['event' => 'tmonier_webhook.webhook_endpoint.pre_create', 'method' => 'onPreCreate'])
+        ->tag('kernel.event_listener', ['event' => 'tmonier_webhook.webhook_endpoint.post_create', 'method' => 'onPostCreate'])
+    ;
+    $services
+        ->set('tmonier_webhook.controller.admin.webhook_endpoint', WebhookEndpointController::class)
+        ->args([
+            service('tmonier_webhook.repository.webhook_endpoint'),
+            service('doctrine.orm.entity_manager'),
+            service('tmonier_webhook.secret_generator'),
+            service('tmonier_webhook.secret_revealer'),
+            service('tmonier_webhook.outbox_recorder'),
+            service('security.csrf.token_manager'),
+            service('router'),
+        ])
+        ->public()
+    ;
+    $services
+        ->set('tmonier_webhook.controller.admin.webhook_delivery', WebhookDeliveryController::class)
+        ->args([
+            service('tmonier_webhook.repository.webhook_delivery'),
+            service('doctrine.orm.entity_manager'),
+            service('security.csrf.token_manager'),
+            service('router'),
+            service('clock'),
+            param('tmonier_webhook.model.webhook_delivery.class'),
+        ])
+        ->public()
+    ;
+    $services
+        ->set('tmonier_webhook.admin_menu_listener', AdminMenuListener::class)
+        ->tag('kernel.event_listener', ['event' => 'sylius.menu.admin.main'])
+    ;
+    $services
+        ->set('tmonier_webhook.twig.extension', WebhookExtension::class)
+        ->args([service('tmonier_webhook.event_type_registry')])
+        ->tag('twig.extension')
     ;
 
     // Commands

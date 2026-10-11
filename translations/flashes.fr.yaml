@@ -1,0 +1,9 @@
+tmonier_webhook:
+    invalid_csrf_token: "Jeton de sécurité invalide, veuillez réessayer."
+    ping_queued: "Ping en file d’attente : le worker (tmonier:webhook:dispatch) l’envoie."
+    cannot_retry: "Seuls les envois en attente ou en échec peuvent être réessayés."
+    retry_scheduled: "L’envoi est dû maintenant : le worker l’enverra à son prochain passage."
+    cannot_replay: "Seuls les envois livrés ou en échec définitif peuvent être rejoués."
+    cannot_replay_anonymized: "Cet événement a été anonymisé : il ne peut pas être rejoué."
+    replay_scheduled: "Rejeu en file d’attente avec le même identifiant de webhook."
+    bulk_replay_done: "%replayed% envoi(s) en file pour rejeu, %skipped% ignoré(s) (en attente, en échec ou anonymisés)."

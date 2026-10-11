@@ -1,0 +1,21 @@
+{% set delivery = hookable_metadata.context.resource %}
+
+<div class="card mb-3">
+    <div class="card-header"><div class="card-title">{{ 'tmonier_webhook.ui.last_response'|trans }}</div></div>
+    <div class="card-body">
+        {% if delivery.attempts == 0 %}
+            <div class="text-secondary">{{ 'tmonier_webhook.ui.no_attempt_yet'|trans }}</div>
+        {% else %}
+            {% if delivery.lastError is not null %}
+                <div class="alert alert-danger" {{ sylius_test_html_attribute('tmonier-webhook-last-error') }}>{{ delivery.lastError }}</div>
+            {% endif %}
+            {% if delivery.lastResponseStatus is not null %}
+                <div class="mb-2"><span class="badge bg-secondary-lt">HTTP {{ delivery.lastResponseStatus }}</span></div>
+            {% endif %}
+            {% if delivery.lastResponseBody is not null %}
+                <pre class="mb-0" style="max-height: 16rem; overflow: auto;" {{ sylius_test_html_attribute('tmonier-webhook-response-body') }}>{{ delivery.lastResponseBody|tmonier_webhook_pretty_body }}</pre>
+                <div class="form-hint">{{ 'tmonier_webhook.ui.response_truncated'|trans }}</div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>

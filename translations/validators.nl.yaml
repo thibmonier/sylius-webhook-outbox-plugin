@@ -1,0 +1,9 @@
+tmonier_webhook:
+    endpoint:
+        url:
+            invalid: "Dit is geen geldige endpoint-URL."
+            https_only: "De endpoint-URL moet https gebruiken."
+            http_or_https: "De endpoint-URL moet http of https gebruiken."
+            no_credentials: "Zet geen gebruikersnaam of wachtwoord in de URL: verzoeken worden ondertekend."
+        event_types:
+            min: "Kies minstens één gebeurtenis."

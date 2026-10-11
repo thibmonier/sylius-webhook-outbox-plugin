@@ -1,0 +1,180 @@
+sylius_grid:
+    templates:
+        action:
+            tmonier_webhook_post: '@TmonierSyliusWebhookOutboxPlugin/admin/grid/action/post.html.twig'
+        bulk_action:
+            tmonier_webhook_bulk_replay: '@TmonierSyliusWebhookOutboxPlugin/admin/grid/bulk_action/replay.html.twig'
+
+    grids:
+        tmonier_webhook_admin_webhook_endpoint:
+            driver:
+                name: doctrine/orm
+                options:
+                    class: "%tmonier_webhook.model.webhook_endpoint.class%"
+            sorting:
+                name: asc
+            fields:
+                name:
+                    type: string
+                    label: sylius.ui.name
+                    sortable: ~
+                url:
+                    type: twig
+                    label: tmonier_webhook.ui.url
+                    options:
+                        template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/grid/field/url.html.twig"
+                eventTypes:
+                    type: twig
+                    label: tmonier_webhook.ui.event_types
+                    options:
+                        template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/grid/field/event_types.html.twig"
+                enabled:
+                    type: twig
+                    label: sylius.ui.enabled
+                    path: .
+                    sortable: enabled
+                    options:
+                        template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/grid/field/enabled.html.twig"
+            filters:
+                search:
+                    type: string
+                    label: sylius.ui.search
+                    options:
+                        fields: [name, url]
+                enabled:
+                    type: boolean
+                    label: sylius.ui.enabled
+            actions:
+                main:
+                    create:
+                        type: create
+                item:
+                    deliveries:
+                        type: show
+                        label: tmonier_webhook.ui.webhook_deliveries
+                        icon: tabler:send
+                        options:
+                            link:
+                                route: tmonier_webhook_admin_webhook_delivery_index
+                                parameters:
+                                    criteria:
+                                        endpoint: resource.id
+                    ping:
+                        type: tmonier_webhook_post
+                        label: tmonier_webhook.ui.ping
+                        icon: tabler:radar
+                        options:
+                            route: tmonier_webhook_admin_webhook_endpoint_ping
+                            token: endpoint
+                    regenerate_secret:
+                        type: tmonier_webhook_post
+                        label: tmonier_webhook.ui.regenerate_secret
+                        icon: tabler:key
+                        options:
+                            route: tmonier_webhook_admin_webhook_endpoint_regenerate_secret
+                            token: endpoint
+                            confirm: tmonier_webhook.ui.regenerate_secret_confirm
+                    update:
+                        type: update
+                    delete:
+                        type: delete
+
+        tmonier_webhook_admin_webhook_delivery:
+            driver:
+                name: doctrine/orm
+                options:
+                    class: "%tmonier_webhook.model.webhook_delivery.class%"
+                    repository:
+                        method: createListQueryBuilder
+            sorting:
+                createdAt: desc
+            limits: [25, 50, 100]
+            fields:
+                createdAt:
+                    type: twig
+                    label: sylius.ui.date
+                    sortable: ~
+                    options:
+                        template: "@SyliusAdmin/shared/grid/field/date.html.twig"
+                        vars:
+                            format: 'd-m-Y H:i:s'
+                eventType:
+                    type: twig
+                    label: tmonier_webhook.ui.event_type
+                    path: .
+                    options:
+                        template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/grid/field/event.html.twig"
+                endpoint:
+                    type: twig
+                    label: tmonier_webhook.ui.endpoint
+                    path: endpoint
+                    options:
+                        template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/grid/field/endpoint.html.twig"
+                status:
+                    type: twig
+                    label: sylius.ui.state
+                    path: .
+                    sortable: status
+                    options:
+                        template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/grid/field/status.html.twig"
+                attempts:
+                    type: string
+                    label: tmonier_webhook.ui.attempts
+                    sortable: ~
+                nextAttemptAt:
+                    type: twig
+                    label: tmonier_webhook.ui.next_attempt
+                    sortable: ~
+                    options:
+                        template: "@SyliusAdmin/shared/grid/field/date.html.twig"
+                        vars:
+                            format: 'd-m-Y H:i:s'
+            filters:
+                status:
+                    type: select
+                    label: sylius.ui.state
+                    form_options:
+                        choices:
+                            tmonier_webhook.ui.status.pending: pending
+                            tmonier_webhook.ui.status.failed: failed
+                            tmonier_webhook.ui.status.delivered: delivered
+                            tmonier_webhook.ui.status.dead: dead
+                endpoint:
+                    type: entity
+                    label: tmonier_webhook.ui.endpoint
+                    form_options:
+                        class: "%tmonier_webhook.model.webhook_endpoint.class%"
+                        choice_label: name
+                eventType:
+                    type: string
+                    label: tmonier_webhook.ui.event_type
+                    options:
+                        fields: [event.type]
+                webhookId:
+                    type: string
+                    label: tmonier_webhook.ui.webhook_id
+                    options:
+                        fields: [event.id]
+                    form_options:
+                        type: equal
+                createdAt:
+                    type: date
+                    label: sylius.ui.date
+            actions:
+                item:
+                    show:
+                        type: show
+                bulk:
+                    replay:
+                        type: tmonier_webhook_bulk_replay
+                        label: tmonier_webhook.ui.replay
+
+        tmonier_webhook_admin_dead_letter:
+            extends: tmonier_webhook_admin_webhook_delivery
+            driver:
+                name: doctrine/orm
+                options:
+                    class: "%tmonier_webhook.model.webhook_delivery.class%"
+                    repository:
+                        method: createListQueryBuilder
+                        arguments: ['dead']

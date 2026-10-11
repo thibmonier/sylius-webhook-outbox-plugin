@@ -1,0 +1,9 @@
+tmonier_webhook:
+    invalid_csrf_token: "Nieprawidłowy token bezpieczeństwa, spróbuj ponownie."
+    ping_queued: "Ping w kolejce: wysyła go worker (tmonier:webhook:dispatch)."
+    cannot_retry: "Ponowić można tylko oczekujące lub nieudane dostarczenia."
+    retry_scheduled: "Dostarczenie jest teraz wymagalne: worker wyśle je przy następnym uruchomieniu."
+    cannot_replay: "Ponownie wysłać można tylko dostarczone lub trwale nieudane dostarczenia."
+    cannot_replay_anonymized: "To zdarzenie zostało zanonimizowane: nie można go wysłać ponownie."
+    replay_scheduled: "Ponowne wysłanie w kolejce z tym samym id webhooka."
+    bulk_replay_done: "%replayed% dostarczeń w kolejce do ponownego wysłania, %skipped% pominiętych (oczekujące, nieudane lub zanonimizowane)."

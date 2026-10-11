@@ -1,0 +1,7 @@
+{% from '@SyliusAdmin/shared/helper/breadcrumbs.html.twig' import breadcrumbs %}
+
+{{ breadcrumbs([
+    { name: 'sylius.ui.dashboard', url: path('sylius_admin_dashboard'), active: false },
+    { name: 'tmonier_webhook.ui.webhook_deliveries', url: path('tmonier_webhook_admin_webhook_delivery_index'), active: false },
+    { name: '#' ~ hookable_metadata.context.resource.id, active: true },
+]) }}

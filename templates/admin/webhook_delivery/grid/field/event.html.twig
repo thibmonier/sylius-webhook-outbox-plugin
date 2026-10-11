@@ -1,0 +1,2 @@
+<div>{{ tmonier_webhook_event_type_label(data.event.type)|trans }} <span class="text-secondary small">{{ data.event.type }}</span></div>
+<div class="small text-secondary"><code>{{ data.event.id }}</code>{% if data.replayOf is not null %} <span class="badge bg-purple-lt">{{ 'tmonier_webhook.ui.replay'|trans }}</span>{% endif %}</div>

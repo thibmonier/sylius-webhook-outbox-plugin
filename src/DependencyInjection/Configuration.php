@@ -17,6 +17,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpoint;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Form\Type\WebhookEndpointType;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\OutboxEventRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookDeliveryRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookEndpointRepository;
@@ -121,14 +122,14 @@ final class Configuration implements ConfigurationInterface
     private function addModelsSection(ArrayNodeDefinition $node): void
     {
         $models = [
-            'webhook_endpoint' => [WebhookEndpoint::class, WebhookEndpointInterface::class, WebhookEndpointRepository::class],
-            'outbox_event' => [OutboxEvent::class, OutboxEventInterface::class, OutboxEventRepository::class],
-            'webhook_delivery' => [WebhookDelivery::class, WebhookDeliveryInterface::class, WebhookDeliveryRepository::class],
+            'webhook_endpoint' => [WebhookEndpoint::class, WebhookEndpointInterface::class, WebhookEndpointRepository::class, WebhookEndpointType::class],
+            'outbox_event' => [OutboxEvent::class, OutboxEventInterface::class, OutboxEventRepository::class, null],
+            'webhook_delivery' => [WebhookDelivery::class, WebhookDeliveryInterface::class, WebhookDeliveryRepository::class, null],
         ];
 
         $children = $node->children()->arrayNode('models')->addDefaultsIfNotSet()->children();
-        foreach ($models as $name => [$model, $interface, $repository]) {
-            $children
+        foreach ($models as $name => [$model, $interface, $repository, $form]) {
+            $classes = $children
                 ->arrayNode($name)
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -140,11 +141,11 @@ final class Configuration implements ConfigurationInterface
                                 ->scalarNode('controller')->defaultValue(ResourceController::class)->cannotBeEmpty()->end()
                                 ->scalarNode('factory')->defaultValue(Factory::class)->end()
                                 ->scalarNode('repository')->defaultValue($repository)->cannotBeEmpty()->end()
-                            ->end()
-                        ->end()
-                    ->end()
-                ->end()
             ;
+            if (null !== $form) {
+                $classes->scalarNode('form')->defaultValue($form)->cannotBeEmpty()->end();
+            }
+            $classes->end()->end()->end()->end();
         }
     }
 }

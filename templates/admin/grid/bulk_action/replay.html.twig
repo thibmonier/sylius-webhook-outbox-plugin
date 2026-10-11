@@ -1,0 +1,11 @@
+{#
+    Bulk replay: reuses the "data-bulk-delete" script of the Sylius admin, which copies the
+    checked rows into "ids[]" inputs on submit.
+#}
+<form method="post" action="{{ path('tmonier_webhook_admin_webhook_delivery_bulk_replay') }}" data-bulk-delete="index" class="d-inline">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token(tmonier_webhook_bulk_token_id()) }}">
+    <button type="submit" class="btn" data-check-all-action="index" disabled {{ sylius_test_html_attribute('tmonier-webhook-bulk-replay') }}>
+        {{ ux_icon('tabler:repeat', {'class': 'icon'}) }}
+        {{ action.label|trans }}
+    </button>
+</form>

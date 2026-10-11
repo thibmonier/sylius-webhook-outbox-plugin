@@ -1,0 +1,9 @@
+tmonier_webhook:
+    invalid_csrf_token: "Token di sicurezza non valido, riprova."
+    ping_queued: "Ping in coda: il worker (tmonier:webhook:dispatch) lo invia."
+    cannot_retry: "Solo gli invii in attesa o falliti possono essere riprovati."
+    retry_scheduled: "L’invio è dovuto ora: il worker lo invierà al prossimo passaggio."
+    cannot_replay: "Solo gli invii consegnati o falliti definitivamente possono essere rinviati."
+    cannot_replay_anonymized: "Questo evento è stato anonimizzato: non può essere rinviato."
+    replay_scheduled: "Rinvio in coda con lo stesso id webhook."
+    bulk_replay_done: "%replayed% invio/i in coda per il rinvio, %skipped% saltato/i (in attesa, falliti o anonimizzati)."

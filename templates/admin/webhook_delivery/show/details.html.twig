@@ -1,0 +1,65 @@
+{% set delivery = hookable_metadata.context.resource %}
+{% set event = delivery.event %}
+
+<div class="card mb-3">
+    <div class="card-header"><div class="card-title">{{ 'tmonier_webhook.ui.details'|trans }}</div></div>
+    <div class="card-body">
+        <div class="datagrid">
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'sylius.ui.state'|trans }}</div>
+                <div class="datagrid-content">{% include '@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/status_badge.html.twig' with { delivery } %}</div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'tmonier_webhook.ui.event_type'|trans }}</div>
+                <div class="datagrid-content">{{ tmonier_webhook_event_type_label(event.type)|trans }} <code>{{ event.type }}</code> v{{ event.version }}</div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'tmonier_webhook.ui.webhook_id'|trans }}</div>
+                <div class="datagrid-content text-break"><code {{ sylius_test_html_attribute('tmonier-webhook-id') }}>{{ event.id }}</code></div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'tmonier_webhook.ui.endpoint'|trans }}</div>
+                <div class="datagrid-content">
+                    <a href="{{ path('tmonier_webhook_admin_webhook_endpoint_update', {'id': delivery.endpoint.id}) }}">{{ delivery.endpoint.name }}</a>
+                    <div class="small text-secondary text-break"><code>{{ delivery.endpoint.url|tmonier_webhook_redact_url }}</code></div>
+                </div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'tmonier_webhook.ui.occurred_at'|trans }}</div>
+                <div class="datagrid-content">{{ event.occurredAt|date('Y-m-d H:i:s', 'UTC') }} UTC</div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'tmonier_webhook.ui.attempts'|trans }}</div>
+                <div class="datagrid-content">{{ delivery.attempts }}</div>
+            </div>
+            {% if delivery.nextAttemptAt is not null %}
+                <div class="datagrid-item">
+                    <div class="datagrid-title">{{ 'tmonier_webhook.ui.next_attempt'|trans }}</div>
+                    <div class="datagrid-content">{{ delivery.nextAttemptAt|date('Y-m-d H:i:s', 'UTC') }} UTC</div>
+                </div>
+            {% endif %}
+            {% if delivery.deliveredAt is not null %}
+                <div class="datagrid-item">
+                    <div class="datagrid-title">{{ 'tmonier_webhook.ui.delivered_at'|trans }}</div>
+                    <div class="datagrid-content">{{ delivery.deliveredAt|date('Y-m-d H:i:s', 'UTC') }} UTC</div>
+                </div>
+            {% endif %}
+            {% if delivery.replayOf is not null %}
+                <div class="datagrid-item">
+                    <div class="datagrid-title">{{ 'tmonier_webhook.ui.replay_of'|trans }}</div>
+                    <div class="datagrid-content"><a href="{{ path('tmonier_webhook_admin_webhook_delivery_show', {'id': delivery.replayOf}) }}">#{{ delivery.replayOf }}</a></div>
+                </div>
+            {% endif %}
+            {% if event.anonymized %}
+                <div class="datagrid-item">
+                    <div class="datagrid-title">{{ 'tmonier_webhook.ui.anonymized_at'|trans }}</div>
+                    <div class="datagrid-content">{{ event.anonymizedAt|date('Y-m-d H:i:s', 'UTC') }} UTC</div>
+                </div>
+            {% endif %}
+            <div class="datagrid-item">
+                <div class="datagrid-title">{{ 'tmonier_webhook.ui.other_deliveries'|trans }}</div>
+                <div class="datagrid-content"><a href="{{ path('tmonier_webhook_admin_webhook_delivery_index', {'criteria': {'webhookId': {'value': event.id}}}) }}">{{ 'tmonier_webhook.ui.same_event'|trans }}</a></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,9 @@
+tmonier_webhook:
+    invalid_csrf_token: "Invalid security token, please try again."
+    ping_queued: "Ping queued: the worker (tmonier:webhook:dispatch) sends it."
+    cannot_retry: "Only pending or failed deliveries can be retried."
+    retry_scheduled: "The delivery is due now: the worker sends it on its next run."
+    cannot_replay: "Only delivered or dead deliveries can be replayed."
+    cannot_replay_anonymized: "This event was anonymized: it cannot be replayed."
+    replay_scheduled: "Replay queued with the same webhook id."
+    bulk_replay_done: "%replayed% delivery(ies) queued for replay, %skipped% skipped (pending, failed or anonymized)."

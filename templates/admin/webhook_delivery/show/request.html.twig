@@ -1,0 +1,11 @@
+{% set delivery = hookable_metadata.context.resource %}
+
+<div class="card mb-3">
+    <div class="card-header"><div class="card-title">{{ 'tmonier_webhook.ui.request_body'|trans }}</div></div>
+    <div class="card-body">
+        <div class="small text-secondary mb-2">
+            <code>POST</code> · <code>content-type: application/json</code> · <code>webhook-id: {{ delivery.event.id }}</code> · <code>webhook-timestamp</code> · <code>webhook-signature: v1,…</code>
+        </div>
+        <pre class="mb-0" style="max-height: 28rem; overflow: auto;" {{ sylius_test_html_attribute('tmonier-webhook-request-body') }}>{{ tmonier_webhook_envelope(delivery.event) }}</pre>
+    </div>
+</div>

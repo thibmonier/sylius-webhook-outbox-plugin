@@ -1,0 +1,6 @@
+{% import '@SyliusAdmin/shared/helper/header.html.twig' as header %}
+{% set delivery = hookable_metadata.context.resource %}
+
+<div class="col-12 col-md-6">
+    {{ header.h1('tmonier_webhook.ui.delivery'|trans ~ ' #' ~ delivery.id, 'tabler:send', delivery.event.type) }}
+</div>

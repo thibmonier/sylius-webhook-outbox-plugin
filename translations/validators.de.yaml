@@ -1,0 +1,9 @@
+tmonier_webhook:
+    endpoint:
+        url:
+            invalid: "Dies ist keine gültige Endpunkt-URL."
+            https_only: "Die Endpunkt-URL muss https verwenden."
+            http_or_https: "Die Endpunkt-URL muss http oder https verwenden."
+            no_credentials: "Keinen Benutzernamen und kein Passwort in die URL schreiben: Die Anfragen sind signiert."
+        event_types:
+            min: "Wählen Sie mindestens ein Ereignis."

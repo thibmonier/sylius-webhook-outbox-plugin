@@ -86,7 +86,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
      *     allow_http_endpoints: bool,
      *     allowed_private_networks: list<string>,
      *     driver: string,
-     *     models: array<string, array{classes: array{model: class-string, interface: class-string, controller: class-string, factory: class-string, repository: class-string}}>,
+     *     models: array<string, array{classes: array{model: class-string, interface: class-string, controller: class-string, factory: class-string, repository: class-string, form?: class-string}}>,
      * }
      */
     private static function config(array $config): array

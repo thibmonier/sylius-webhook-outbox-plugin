@@ -1,0 +1,19 @@
+{% set delivery = hookable_metadata.context.resource %}
+{% set token = csrf_token(tmonier_webhook_delivery_token_id(delivery.id)) %}
+
+<div class="col-12 col-md-6 d-flex justify-content-md-end gap-2 mt-2 mt-md-0">
+    {% if delivery.canBeRetriedNow %}
+        <form method="post" action="{{ path('tmonier_webhook_admin_webhook_delivery_retry', {'id': delivery.id}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ token }}">
+            <button type="submit" class="btn btn-primary" {{ sylius_test_html_attribute('tmonier-webhook-retry') }}>{{ ux_icon('tabler:player-play', {'class': 'icon'}) }} {{ 'tmonier_webhook.ui.retry_now'|trans }}</button>
+        </form>
+    {% endif %}
+    {% if delivery.canBeReplayed %}
+        <form method="post" action="{{ path('tmonier_webhook_admin_webhook_delivery_replay', {'id': delivery.id}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ token }}">
+            <button type="submit" class="btn" {{ sylius_test_html_attribute('tmonier-webhook-replay') }}>{{ ux_icon('tabler:repeat', {'class': 'icon'}) }} {{ 'tmonier_webhook.ui.replay'|trans }}</button>
+        </form>
+    {% elseif delivery.event.anonymized %}
+        <span class="text-secondary small align-self-center">{{ 'tmonier_webhook.ui.anonymized_no_replay'|trans }}</span>
+    {% endif %}
+</div>

@@ -1,0 +1,2 @@
+<span class="badge bg-{{ tmonier_webhook_status_color(delivery.status) }}-lt" {{ sylius_test_html_attribute('tmonier-webhook-status', delivery.status) }}>{{ ('tmonier_webhook.ui.status.' ~ delivery.status)|trans }}</span>
+{% if delivery.lastResponseStatus is not null %}<span class="badge bg-secondary-lt">HTTP {{ delivery.lastResponseStatus }}</span>{% endif %}

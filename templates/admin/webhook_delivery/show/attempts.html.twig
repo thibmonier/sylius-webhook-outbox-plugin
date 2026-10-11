@@ -1,0 +1,32 @@
+{% set delivery = hookable_metadata.context.resource %}
+
+<div class="card mb-3">
+    <div class="card-header"><div class="card-title">{{ 'tmonier_webhook.ui.attempt_history'|trans }}</div></div>
+    {% if delivery.attemptHistory is empty %}
+        <div class="card-body text-secondary">{{ 'tmonier_webhook.ui.no_attempt_yet'|trans }}</div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table" {{ sylius_test_html_attribute('tmonier-webhook-attempts') }}>
+                <thead>
+                    <tr>
+                        <th>{{ 'sylius.ui.date'|trans }}</th>
+                        <th>HTTP</th>
+                        <th>{{ 'tmonier_webhook.ui.duration'|trans }}</th>
+                        <th>{{ 'tmonier_webhook.ui.error'|trans }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in delivery.attemptHistory %}
+                        <tr>
+                            <td class="text-nowrap">{{ attempt.at|date('Y-m-d H:i:s', 'UTC') }} UTC</td>
+                            <td>{{ attempt.status_code ?? '–' }}</td>
+                            <td class="text-nowrap">{{ attempt.duration_ms }} ms</td>
+                            <td class="text-break small">{{ attempt.error ?? '' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer small text-secondary">{{ 'tmonier_webhook.ui.history_limit'|trans({'%count%': constant('Tmonier\\SyliusWebhookOutboxPlugin\\Entity\\WebhookDeliveryInterface::HISTORY_SIZE')}) }}</div>
+    {% endif %}
+</div>

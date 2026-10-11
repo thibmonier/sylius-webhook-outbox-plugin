@@ -1,0 +1,8 @@
+{% set form = hookable_metadata.context.form %}
+
+<div class="col-12 col-md-6">{{ form_row(form.name, sylius_test_form_attribute('name')) }}</div>
+<div class="col-12 col-md-6">{{ form_row(form.url, sylius_test_form_attribute('url')) }}</div>
+<div class="col-12">{{ form_row(form.description, sylius_test_form_attribute('description')) }}</div>
+<div class="col-12">{{ form_row(form.enabled, sylius_test_form_attribute('enabled')) }}</div>
+<div class="col-12 col-md-6">{{ form_row(form.eventTypes, sylius_test_form_attribute('event-types')) }}</div>
+<div class="col-12 col-md-6">{{ form_row(form.channelCodes, sylius_test_form_attribute('channels')) }}</div>
