@@ -193,6 +193,10 @@ Round 2: the endpoint-state reconciliation checks the state inside each UPDATE (
 skips live claims and also requeues suspended deliveries of enabled endpoints, so the state
 converges whatever the races; known hook providers (Zapier, Slack, Discord, Make) have their
 whole credential path hidden; a VarDumper caster redacts the secret and the URL in dumps.
+Round 3: the reconciliation was a full scan on every claim (2–3 s with 1M deliveries). It now
+runs at most every 30 s per worker, reads the (tiny) endpoint table, checks candidates with an
+indexed read on (endpoint_id, status) before each UPDATE (an UPDATE matching nothing would
+still hold gap locks), and keeps the enabled check inside the UPDATE (TOCTOU).
 
 ## 5. Tests
 

@@ -22,6 +22,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookSenderInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\DeliveryAttempt;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpoint;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
@@ -167,6 +168,33 @@ final class DispatchTest extends KernelTestCase
 
         self::assertNull($this->dispatcher()->dispatchNext());
         self::assertSame('suspended', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$delivery->getId()]));
+    }
+
+    public function testReconciliationIsThrottledPerWorker(): void
+    {
+        [$endpoint, $first] = $this->pendingDelivery();
+        $this->entityManager()->persist($this->newCustomer());
+        $this->entityManager()->flush();
+        $second = $this->deliveriesOf($endpoint)[1];
+        $this->connection()->update('tmonier_webhook_endpoint', ['enabled' => 0], ['id' => $endpoint->getId()]);
+        $this->connection()->update('tmonier_webhook_delivery', ['status' => 'delivered'], ['id' => $second->getId()]);
+
+        $doctrine = self::getContainer()->get('doctrine');
+        self::assertInstanceOf(ManagerRegistry::class, $doctrine);
+        $claimer = new DeliveryClaimer($doctrine, new NativeClock(), WebhookDelivery::class, WebhookEndpoint::class, 90, 3600);
+
+        self::assertNull($claimer->claimNext());
+        self::assertSame('suspended', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$first->getId()]), 'First claim: reconciled.');
+
+        // Another stray pending delivery: not looked at again before the interval.
+        $this->connection()->update('tmonier_webhook_delivery', ['status' => 'pending'], ['id' => $second->getId()]);
+        self::assertNull($claimer->claimNext());
+        self::assertFalse($claimer->reconcileIfDue());
+        self::assertSame('pending', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$second->getId()]));
+
+        $eager = new DeliveryClaimer($doctrine, new NativeClock(), WebhookDelivery::class, WebhookEndpoint::class, 90, 0);
+        self::assertTrue($eager->reconcileIfDue());
+        self::assertSame('suspended', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$second->getId()]));
     }
 
     public function testLogsAndErrorsNeverContainTheUrlCredentials(): void

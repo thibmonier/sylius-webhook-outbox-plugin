@@ -7,6 +7,8 @@
             <!-- Claim query of the worker. -->
             <index name="tmonier_webhook_delivery_due_idx" columns="status,next_attempt_at,id" />
             <index name="tmonier_webhook_delivery_created_at_idx" columns="created_at" />
+            <!-- Endpoint state reconciliation (also serves the endpoint foreign key). -->
+            <index name="tmonier_webhook_delivery_endpoint_status_idx" columns="endpoint_id,status" />
         </indexes>
 
         <id name="id" column="id" type="integer">

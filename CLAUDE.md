@@ -43,7 +43,8 @@ Databases: `tmonier_sylius_webhook_outbox_dev` / `_test`. The kernel cache lives
   `docs/schemas/*.json` (checked by `PayloadSchemaTest`) and the README. Never expose tokens,
   passwords, the order token or the customer IP.
 - `src/Delivery` — `DeliveryClaimer` (plain candidate read, then SKIP LOCKED on one primary
-  key + lease; FOR UPDATE when DBAL says unsupported), `WebhookDispatcher` (entity manager
+  key + lease; FOR UPDATE when DBAL says unsupported; endpoint-state reconciliation at most
+  every 30 s, index-driven, never an UPDATE without a prior indexed read), `WebhookDispatcher` (entity manager
   from the registry; on error: release the claim, reset a closed manager; re-read under the
   row lock before recording), `HttpWebhookSender`, `RetryPolicy`, `EnvelopeFactory`.
 - `src/EventListener/EndpointAvailabilityListener` — disabling an endpoint suspends its open

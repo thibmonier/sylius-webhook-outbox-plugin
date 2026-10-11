@@ -70,7 +70,7 @@ final class Version20261011120000 extends AbstractMigration
         $delivery->addIndex(['status', 'next_attempt_at', 'id'], 'tmonier_webhook_delivery_due_idx');
         $delivery->addIndex(['created_at'], 'tmonier_webhook_delivery_created_at_idx');
         $delivery->addIndex(['event_id'], 'IDX_38E5E40C71F7E88B');
-        $delivery->addIndex(['endpoint_id'], 'IDX_38E5E40C21AF7E36');
+        $delivery->addIndex(['endpoint_id', 'status'], 'tmonier_webhook_delivery_endpoint_status_idx');
         $delivery->addForeignKeyConstraint('tmonier_webhook_outbox_event', ['event_id'], ['id'], ['onDelete' => 'CASCADE'], 'FK_38E5E40C71F7E88B');
         $delivery->addForeignKeyConstraint('tmonier_webhook_endpoint', ['endpoint_id'], ['id'], ['onDelete' => 'CASCADE'], 'FK_38E5E40C21AF7E36');
     }
