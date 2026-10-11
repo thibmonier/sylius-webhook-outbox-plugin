@@ -10,9 +10,6 @@ use Sylius\Bundle\ResourceBundle\Doctrine\ORM\EntityRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEventInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface;
 
-/**
- * @extends EntityRepository<OutboxEventInterface>
- */
 class OutboxEventRepository extends EntityRepository implements OutboxEventRepositoryInterface
 {
     public function findByCustomerId(int $customerId): array

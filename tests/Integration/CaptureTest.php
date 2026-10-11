@@ -40,7 +40,7 @@ final class CaptureTest extends KernelTestCase
         $this->entityManager()->persist($customer);
         $this->entityManager()->flush();
 
-        self::assertSame([], $this->eventsOfType('customer.created', (string) $customer->getId()));
+        self::assertSame([], $this->eventsOfType('customer.created', (string) $this->idOf($customer)));
     }
 
     public function testOneDeliveryPerSubscribedEndpointAndChannelFilter(): void
@@ -57,7 +57,7 @@ final class CaptureTest extends KernelTestCase
         $this->entityManager()->persist($order);
         $this->entityManager()->flush();
 
-        $events = $this->eventsOfType('order.placed', (string) $order->getId());
+        $events = $this->eventsOfType('order.placed', (string) $this->idOf($order));
         self::assertCount(1, $events);
         self::assertSame($channel->getCode(), $events[0]->getChannelCode());
         self::assertCount(1, $this->deliveriesOf($all));
@@ -73,7 +73,7 @@ final class CaptureTest extends KernelTestCase
         $order = $this->newCompletedOrder($this->newCustomer());
         $this->entityManager()->persist($order);
         $this->entityManager()->flush();
-        $id = (string) $order->getId();
+        $id = (string) $this->idOf($order);
 
         $order->setShippingState(OrderShippingStates::STATE_SHIPPED);
         $this->entityManager()->flush();
@@ -98,7 +98,7 @@ final class CaptureTest extends KernelTestCase
         $customer = $this->newCustomer();
         $this->entityManager()->persist($customer);
         $this->entityManager()->flush();
-        $id = (string) $customer->getId();
+        $id = (string) $this->idOf($customer);
 
         $customer->setFirstName('Augusta');
         $customer->setLastName('King');
@@ -121,7 +121,7 @@ final class CaptureTest extends KernelTestCase
         $this->entityManager()->persist($customer);
         $this->entityManager()->flush();
 
-        $json = EnvelopeFactory::encode($this->eventsOfType('customer.created', (string) $customer->getId())[0]);
+        $json = EnvelopeFactory::encode($this->eventsOfType('customer.created', (string) $this->idOf($customer))[0]);
         foreach (['password', 'token', 'salt', 'roles'] as $forbidden) {
             self::assertStringNotContainsStringIgnoringCase($forbidden, $json);
         }
@@ -162,7 +162,7 @@ final class CaptureTest extends KernelTestCase
 
         self::assertNotNull($ping);
         self::assertCount(1, $this->deliveriesOf($endpoint));
-        self::assertSame((string) $endpoint->getId(), $ping->getResourceId());
+        self::assertSame((string) $this->idOf($endpoint), $ping->getResourceId());
         self::assertSame(1, $ping->getVersion());
     }
 

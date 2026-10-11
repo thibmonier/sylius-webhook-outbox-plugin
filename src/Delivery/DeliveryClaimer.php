@@ -70,12 +70,12 @@ final class DeliveryClaimer
                 ->setMaxResults(1)
                 ->setParameter('statuses', [WebhookDeliveryInterface::STATUS_PENDING, WebhookDeliveryInterface::STATUS_FAILED], ArrayParameterType::STRING)
                 ->setParameter('now', $now, Types::DATETIME_IMMUTABLE)
-                ->setParameter('endpoints', array_map('intval', $endpointIds), ArrayParameterType::INTEGER)
+                ->setParameter('endpoints', array_map(static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0, $endpointIds), ArrayParameterType::INTEGER)
             ;
             $this->lock($query);
 
             $id = $query->executeQuery()->fetchOne();
-            if (false === $id || null === $id) {
+            if (!is_numeric($id)) {
                 return null;
             }
 

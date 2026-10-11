@@ -39,9 +39,13 @@ final class AdminUrlGenerator
             }
         }
 
+        $named = [];
+        foreach ($parameters as $name => $value) {
+            $named[(string) $name] = $value;
+        }
+
         try {
-            /** @var array<string, mixed> $parameters */
-            return $this->urlGenerator->generate($route, $parameters, UrlGeneratorInterface::ABSOLUTE_URL);
+            return $this->urlGenerator->generate($route, $named, UrlGeneratorInterface::ABSOLUTE_URL);
         } catch (\Throwable) {
             return null;
         }

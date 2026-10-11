@@ -7,9 +7,6 @@ namespace Tmonier\SyliusWebhookOutboxPlugin\Repository;
 use Sylius\Bundle\ResourceBundle\Doctrine\ORM\EntityRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
 
-/**
- * @extends EntityRepository<WebhookEndpointInterface>
- */
 class WebhookEndpointRepository extends EntityRepository implements WebhookEndpointRepositoryInterface
 {
     public function findSubscribed(string $eventType, ?string $channelCode): array

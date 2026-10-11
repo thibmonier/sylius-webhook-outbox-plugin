@@ -81,20 +81,20 @@ final class TransactionalOutboxTest extends KernelTestCase
 
         $placed = $this->committedEvents('order.placed', (string) $orderId);
         self::assertCount(1, $placed, 'order.placed is committed with the order.');
-        self::assertSame($customerId, (int) $placed[0]['customer_id'], 'customer_id of a customer inserted in the same flush is resolved.');
-        $payload = json_decode((string) $placed[0]['payload'], true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame($customerId, self::int($placed[0]['customer_id']), 'customer_id of a customer inserted in the same flush is resolved.');
+        $payload = json_decode(self::string($placed[0]['payload']), true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($payload);
         self::assertSame($orderId, $payload['id']);
         self::assertSame($order->getNumber(), $payload['number']);
         self::assertIsArray($payload['customer']);
         self::assertSame($customerId, $payload['customer']['id']);
-        self::assertStringEndsWith('/admin/orders/' . $orderId, (string) $payload['admin_url']);
+        self::assertStringEndsWith('/admin/orders/' . $orderId, self::string($payload['admin_url']));
 
         $created = $this->committedEvents('customer.created', (string) $customerId);
         self::assertCount(1, $created, 'customer.created is committed with the customer.');
         self::assertSame(
             1,
-            (int) $this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_delivery WHERE event_id = ? AND status = ?', [$created[0]['id'], 'pending']),
+            self::int($this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_delivery WHERE event_id = ? AND status = ?', [$created[0]['id'], 'pending'])),
             'One pending delivery per subscribed endpoint.',
         );
 
@@ -117,7 +117,7 @@ final class TransactionalOutboxTest extends KernelTestCase
         $this->entityManager()->flush();
         $customerId = $this->idOf($customer);
 
-        self::assertGreaterThan(0, (int) $this->connection()->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event WHERE customer_id = ?', [$customerId]), 'Written inside the transaction.');
+        self::assertGreaterThan(0, self::int($this->connection()->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event WHERE customer_id = ?', [$customerId])), 'Written inside the transaction.');
         self::assertSame(0, $this->committedCount($customerId), 'Not visible from another connection before the commit.');
 
         $this->connection()->rollBack();
@@ -132,7 +132,7 @@ final class TransactionalOutboxTest extends KernelTestCase
         $this->emails[] = (string) $existing->getEmail();
         $this->entityManager()->persist($existing);
         $this->entityManager()->flush();
-        $eventsBefore = (int) $this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event');
+        $eventsBefore = self::int($this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event'));
 
         // Same e-mail: the unique index fails the flush after the event rows were written.
         $duplicate = $this->newCustomer((string) $existing->getEmail());
@@ -147,7 +147,7 @@ final class TransactionalOutboxTest extends KernelTestCase
         } catch (UniqueConstraintViolationException) {
         }
 
-        self::assertSame($eventsBefore, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event'), 'No event committed when the flush fails.');
+        self::assertSame($eventsBefore, self::int($this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event')), 'No event committed when the flush fails.');
         self::assertFalse($this->observer->fetchOne('SELECT id FROM sylius_order WHERE number = ?', [$order->getNumber()]));
 
         $doctrine = self::getContainer()->get('doctrine');
@@ -176,7 +176,7 @@ final class TransactionalOutboxTest extends KernelTestCase
             ->select('id')
             ->from('tmonier_webhook_delivery')
             ->where('id = :id')
-            ->setParameter('id', min($this->deliveryIdsOfTestEndpoint()))
+            ->setParameter('id', min([\PHP_INT_MAX, ...$this->deliveryIdsOfTestEndpoint()]))
             ->forUpdate()
             ->executeQuery()
             ->fetchOne()
@@ -192,7 +192,7 @@ final class TransactionalOutboxTest extends KernelTestCase
                     break;
                 }
             }
-            self::assertNotContains((int) $lockedId, $claims);
+            self::assertNotContains(self::int($lockedId), $claims);
             self::assertNotEmpty(array_intersect($claims, $this->deliveryIdsOfTestEndpoint()), 'The other delivery of the test endpoint is claimed.');
         } finally {
             $this->observer->rollBack();
@@ -213,12 +213,12 @@ final class TransactionalOutboxTest extends KernelTestCase
 
     private function committedCount(int $customerId): int
     {
-        return (int) $this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event WHERE customer_id = ?', [$customerId]);
+        return self::int($this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event WHERE customer_id = ?', [$customerId]));
     }
 
     /** @return list<int> */
     private function deliveryIdsOfTestEndpoint(): array
     {
-        return array_map('intval', $this->observer->fetchFirstColumn('SELECT id FROM tmonier_webhook_delivery WHERE endpoint_id = ?', [$this->endpointIds[0]]));
+        return array_map(self::int(...), $this->observer->fetchFirstColumn('SELECT id FROM tmonier_webhook_delivery WHERE endpoint_id = ?', [$this->endpointIds[0]]));
     }
 }

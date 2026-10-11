@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tmonier\SyliusWebhookOutboxPlugin\Payload;
 
 use Sylius\Component\Core\Model\AddressInterface;
+use Sylius\Component\Core\Model\CustomerInterface;
 use Sylius\Component\Core\Model\OrderInterface;
 use Sylius\Component\Core\Model\OrderItemInterface;
 use Sylius\Component\Core\Model\PaymentInterface;
@@ -29,6 +30,7 @@ final class OrderPayloadNormalizer
     public function normalize(OrderInterface $order): array
     {
         $id = LazyValue::idOf($order);
+        $customer = $order->getCustomer();
 
         return [
             'id' => $id,
@@ -50,7 +52,7 @@ final class OrderPayloadNormalizer
                 'total' => $order->getTotal(),
             ],
             'promotion_coupon' => $order->getPromotionCoupon()?->getCode(),
-            'customer' => $this->customerNormalizer->summarize($order->getCustomer()),
+            'customer' => $this->customerNormalizer->summarize($customer instanceof CustomerInterface ? $customer : null),
             'billing_address' => self::address($order->getBillingAddress()),
             'shipping_address' => self::address($order->getShippingAddress()),
             'items' => array_values(array_map(self::item(...), $order->getItems()->toArray())),

@@ -75,7 +75,9 @@ final class SubnetCalculator
     /** @return array{bits: string, v6: bool} network prefix as a string of "0" and "1" */
     private static function parse(string $cidr): array
     {
-        [$address, $length] = str_contains($cidr, '/') ? explode('/', $cidr, 2) : [$cidr, null];
+        $parts = explode('/', $cidr, 2);
+        $address = $parts[0];
+        $length = $parts[1] ?? null;
         $packed = @inet_pton($address);
         if (false === $packed) {
             throw new \InvalidArgumentException(sprintf('"%s" is not a valid IP address or CIDR range.', $cidr));
@@ -95,10 +97,11 @@ final class SubnetCalculator
     private static function format(array $network): string
     {
         $bits = str_pad($network['bits'], $network['v6'] ? 128 : 32, '0');
-        $packed = '';
-        foreach (str_split($bits, 8) as $byte) {
-            $packed .= chr((int) bindec($byte));
+        $hex = '';
+        foreach (str_split($bits, 4) as $nibble) {
+            $hex .= base_convert($nibble, 2, 16);
         }
+        $packed = (string) hex2bin($hex);
 
         return sprintf('%s/%d', (string) inet_ntop($packed), strlen($network['bits']));
     }

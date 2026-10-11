@@ -38,12 +38,12 @@ final class AnonymizeCustomerWebhooksCommand extends Command
             $customerId = (int) $customer;
         } else {
             $found = $this->customerRepository->findOneBy(['emailCanonical' => mb_strtolower($customer)]);
-            if (!$found instanceof CustomerInterface || null === $found->getId()) {
+            if (!$found instanceof CustomerInterface || !is_int($found->getId())) {
                 $output->writeln('<error>No customer with this e-mail. Pass the customer id instead.</error>');
 
                 return Command::FAILURE;
             }
-            $customerId = (int) $found->getId();
+            $customerId = $found->getId();
         }
 
         $output->writeln(sprintf('%d webhook event(s) anonymized for customer #%d.', $this->anonymizer->anonymize($customerId), $customerId));

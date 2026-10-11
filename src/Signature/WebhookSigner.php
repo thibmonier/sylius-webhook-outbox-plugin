@@ -46,7 +46,8 @@ final class WebhookSigner
         string $timestamp,
         string $body,
         string $signatureHeader,
-        #[\SensitiveParameter] string $secret,
+        #[\SensitiveParameter]
+        string $secret,
         int $now,
         int $tolerance = self::DEFAULT_TOLERANCE,
     ): bool {

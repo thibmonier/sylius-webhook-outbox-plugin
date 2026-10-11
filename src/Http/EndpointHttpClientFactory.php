@@ -21,7 +21,7 @@ final class EndpointHttpClientFactory
         float $timeout = 15,
         float $maxDuration = 30,
     ): HttpClientInterface {
-        $subnets = [] === $allowedPrivateNetworks ? null : SubnetCalculator::subtract(array_values(IpUtils::PRIVATE_SUBNETS), $allowedPrivateNetworks);
+        $subnets = [] === $allowedPrivateNetworks ? null : SubnetCalculator::subtract(IpUtils::PRIVATE_SUBNETS, $allowedPrivateNetworks);
 
         return (new NoPrivateNetworkHttpClient($transport, $subnets))->withOptions([
             'timeout' => $timeout,

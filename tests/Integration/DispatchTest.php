@@ -71,7 +71,7 @@ final class DispatchTest extends KernelTestCase
         self::assertSame(['id', 'type', 'version', 'timestamp', 'channel', 'data'], array_keys($body));
         self::assertSame('customer.created', $body['type']);
         self::assertSame(1, $body['version']);
-        self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', (string) $body['timestamp']);
+        self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', self::string($body['timestamp']));
 
         self::assertNull($this->dispatcher()->dispatchNext(), 'Nothing left to send.');
     }
@@ -177,7 +177,6 @@ final class DispatchTest extends KernelTestCase
             $this->entityManager()->flush();
         }
 
-        self::assertNotNull($processed);
         self::assertSame(WebhookDeliveryInterface::STATUS_DEAD, $processed->getStatus());
         self::assertSame(10, $processed->getAttempts());
         self::assertCount(WebhookDeliveryInterface::HISTORY_SIZE, $processed->getAttemptHistory());
@@ -194,7 +193,8 @@ final class DispatchTest extends KernelTestCase
 
         // The other worker crashed: its lease expired.
         $this->connection()->update($table, ['claimed_until' => (new \DateTimeImmutable('-1 minute', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s')], ['id' => $delivery->getId()]);
-        $processed = $this->dispatcher()->dispatchNext();
+        $dispatcher = $this->dispatcher();
+        $processed = $dispatcher->dispatchNext();
         self::assertNotNull($processed);
         self::assertSame(WebhookDeliveryInterface::STATUS_DELIVERED, $processed->getStatus());
         self::assertNull($this->connection()->fetchOne('SELECT claim_token FROM tmonier_webhook_delivery WHERE id = ?', [$delivery->getId()]));

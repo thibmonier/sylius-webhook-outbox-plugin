@@ -83,7 +83,7 @@ final class RetryPolicy
             return (int) $header;
         }
 
-        $date = \DateTimeImmutable::createFromFormat(\DATE_RFC7231, $header, new \DateTimeZone('GMT'));
+        $date = \DateTimeImmutable::createFromFormat('D, d M Y H:i:s \G\M\T', $header, new \DateTimeZone('GMT'));
         if (false === $date) {
             return null;
         }

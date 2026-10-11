@@ -37,8 +37,8 @@ final class CustomerEventDetector implements ChangeDetectorInterface
             }
 
             $changed = [];
-            foreach ($unitOfWork->getEntityChangeSet($customer) as $field => [$old, $new]) {
-                if (isset(CustomerPayloadNormalizer::UPDATE_FIELDS[$field]) && !self::same($old, $new)) {
+            foreach ($unitOfWork->getEntityChangeSet($customer) as $field => $change) {
+                if (isset(CustomerPayloadNormalizer::UPDATE_FIELDS[$field]) && is_array($change) && !self::same($change[0] ?? null, $change[1] ?? null)) {
                     $changed[] = CustomerPayloadNormalizer::UPDATE_FIELDS[$field];
                 }
             }

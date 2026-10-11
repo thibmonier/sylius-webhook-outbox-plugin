@@ -6,7 +6,7 @@ parameters:
         - tests/Functional
         - tests/Unit
         - tests/Integration
-        - tests/AuditLogTestTrait.php
+        - tests/WebhookTestTrait.php
 
     excludePaths:
         # Makes PHPStan crash

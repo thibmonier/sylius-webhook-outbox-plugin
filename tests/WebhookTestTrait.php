@@ -160,6 +160,20 @@ trait WebhookTestTrait
         return $receiver;
     }
 
+    private static function int(mixed $value): int
+    {
+        self::assertIsNumeric($value);
+
+        return (int) $value;
+    }
+
+    private static function string(mixed $value): string
+    {
+        self::assertIsString($value);
+
+        return $value;
+    }
+
     private function idOf(object $resource): int
     {
         self::assertTrue(method_exists($resource, 'getId'));

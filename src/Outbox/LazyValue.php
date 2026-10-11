@@ -23,7 +23,7 @@ final class LazyValue
     /**
      * The entity id if it is already known, a lazy reference otherwise.
      */
-    public static function idOf(object $entity): int|string|self|null
+    public static function idOf(object $entity): int|string|self
     {
         $id = self::readId($entity);
         if (null !== $id) {

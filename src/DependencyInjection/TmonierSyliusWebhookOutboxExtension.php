@@ -24,13 +24,13 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
 
     public function load(array $configs, ContainerBuilder $container): void
     {
-        $config = $this->processConfiguration(new Configuration(), $configs);
+        $config = self::config($this->processConfiguration(new Configuration(), $configs));
 
         $this->registerResources('tmonier_webhook', $config['driver'], $config['models'], $container);
 
         $container->setParameter('tmonier_webhook.enabled', $config['enabled']);
         $container->setParameter('tmonier_webhook.events', $config['events']);
-        $container->setParameter('tmonier_webhook.retry_schedule', array_values($config['retry_schedule']));
+        $container->setParameter('tmonier_webhook.retry_schedule', $config['retry_schedule']);
         $container->setParameter('tmonier_webhook.retry_jitter', $config['retry_jitter']);
         $container->setParameter('tmonier_webhook.timeout', $config['timeout']);
         $container->setParameter('tmonier_webhook.max_duration', $config['max_duration']);
@@ -50,7 +50,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
 
     public function prepend(ContainerBuilder $container): void
     {
-        $config = $this->processConfiguration(new Configuration(), $container->getExtensionConfig($this->getAlias()));
+        $config = self::config($this->processConfiguration(new Configuration(), $container->getExtensionConfig($this->getAlias())));
         foreach ($config['models'] as $name => $model) {
             $container->setParameter(sprintf('tmonier_webhook.model.%s.class', $name), $model['classes']['model']);
         }
@@ -69,6 +69,30 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
         ]);
 
         $this->prependDoctrineMigrations($container);
+    }
+
+    /**
+     * The processed configuration, as guaranteed by Configuration.
+     *
+     * @return array{
+     *     enabled: bool,
+     *     events: array<string, array{enabled: bool}>,
+     *     retry_schedule: list<int>,
+     *     retry_jitter: float,
+     *     timeout: float,
+     *     max_duration: float,
+     *     response_body_max_bytes: int,
+     *     retention_days: int|null,
+     *     allow_http_endpoints: bool,
+     *     allowed_private_networks: list<string>,
+     *     driver: string,
+     *     models: array<string, array{classes: array{model: class-string, interface: class-string, controller: class-string, factory: class-string, repository: class-string}}>,
+     * }
+     */
+    private static function config(array $config): array
+    {
+        /** @phpstan-ignore return.type (shape enforced by the configuration tree) */
+        return $config;
     }
 
     protected function getMigrationsNamespace(): string
