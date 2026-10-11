@@ -56,6 +56,7 @@ tmonier_webhook:
             failed: "Échec, nouvel essai prévu"
             delivered: "Livré"
             dead: "Échec définitif"
+            suspended: "Suspendu (endpoint désactivé)"
     event_type:
         order:
             placed: "Commande passée"

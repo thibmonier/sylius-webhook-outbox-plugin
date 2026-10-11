@@ -5,7 +5,7 @@
     <mapped-superclass name="Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery" table="tmonier_webhook_delivery">
         <indexes>
             <!-- Claim query of the worker. -->
-            <index name="tmonier_webhook_delivery_due_idx" columns="status,next_attempt_at" />
+            <index name="tmonier_webhook_delivery_due_idx" columns="status,next_attempt_at,id" />
             <index name="tmonier_webhook_delivery_created_at_idx" columns="created_at" />
         </indexes>
 

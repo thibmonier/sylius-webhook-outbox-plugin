@@ -152,6 +152,36 @@ Roles depend on the receiver: the merchant's ERP is not a third party; an iPaaS 
 transfers (chapter V: adequacy such as the DPF, or SCCs). Retention via `purge`, erasure via
 `anonymize-customer` (`customer_id` column).
 
+### Review fixes (2026-10-11)
+
+An adversarial code review (19 findings) led to these decisions:
+
+- **Worker recovery**: any exception while recording an attempt closes the entity manager
+  (`wrapInTransaction`). The dispatcher releases the claim and resets the manager through the
+  `ManagerRegistry`, so a `--loop` worker keeps working; it gets its entity manager from the
+  registry each time.
+- **Erasure vs. write-back**: the attempt is recorded after re-reading the delivery and its
+  event under the row lock; the response excerpt of an anonymized event is dropped. The
+  anonymizer locks the delivery rows (`PESSIMISTIC_WRITE`) before erasing.
+- **Disabled endpoints**: their open deliveries become `suspended` (purgeable, not dead
+  letters), requeued when the endpoint is enabled again; ping, replay and retry are refused.
+- **Claim locking**: a plain read of candidates per status along the
+  `(status, next_attempt_at, id)` index, then `FOR UPDATE SKIP LOCKED` on one primary key, so
+  that a claim locks one row and never blocks the checkout inserts or the other workers.
+- **Network**: environment proxies are ignored by the delivery client (a proxy resolves the
+  host itself); `symfony/http-client` and `http-foundation` require 6.4.15+ (CVE-2024-50342
+  fix and the full private ranges).
+- **Redaction**: URLs are parsed and rebuilt everywhere (messages included, whatever the
+  encoding), the query is always hidden, path segments that look like tokens too
+  (`url_redaction_pattern`).
+- **Capture**: per-entity isolation of normalization errors (`EntityGuard`, entity id logged);
+  `DeferredPayload` never caches unresolved ids; new tracked variants publish their initial
+  stock; a former guest creating an account gives `customer.updated` with `has_account`;
+  event ids are strictly increasing within a process (receivers sort by id, the timestamp has
+  a one-second precision).
+- `Retry-After` accepts the three HTTP-date formats of RFC 9110; the cron run never starts a
+  request that could outlive `--time-limit` (and the README uses `flock`).
+
 ## 5. Tests
 
 - Unit: signer (specification vectors), retry policy, subnet calculation, SSRF client
@@ -159,7 +189,9 @@ transfers (chapter V: adequacy such as the DPF, or SCCs). Retention via `purge`,
   Retry-After, transport errors without credentials, no redirect), lazy payloads, entities,
   configuration, registry, redactor, translations.
 - Integration: **real commits and rollbacks** (`TransactionalOutboxTest`: commit, explicit
-  rollback, failing flush, concurrent claim with `SKIP LOCKED`), capture rules, worker
+  rollback, flush failing after the event insert, concurrent claim with `SKIP LOCKED`, claim
+  not blocking inserts, worker recovery after a failed record, lost lease, erasure during the
+  request), capture rules, worker
   (`MockHttpClient` through the real SSRF guard: 200, 500, 429 + Retry-After, 410, timeout,
   private networks, http refused, exhaustion, expired / live leases, command), purge,
   anonymization, payload schemas.

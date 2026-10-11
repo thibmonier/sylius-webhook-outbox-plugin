@@ -7,11 +7,27 @@ namespace Tests\Tmonier\SyliusWebhookOutboxPlugin\Integration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\PostPersistEventArgs;
+use Doctrine\ORM\Events;
 use Doctrine\Persistence\ManagerRegistry;
+use Psr\Log\NullLogger;
 use Sylius\Component\Core\OrderPaymentStates;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\NativeClock;
 use Tests\Tmonier\SyliusWebhookOutboxPlugin\WebhookTestTrait;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\DeliveryClaimer;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\RetryPolicy;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookDispatcher;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookRequest;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookSenderInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\DeliveryAttempt;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEventInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
+use Tmonier\SyliusWebhookOutboxPlugin\Signature\WebhookSigner;
 
 /**
  * The outbox guarantee, with REAL commits and rollbacks (no wrapping test transaction): an
@@ -126,33 +142,161 @@ final class TransactionalOutboxTest extends KernelTestCase
         self::assertFalse($this->observer->fetchOne('SELECT id FROM sylius_customer WHERE email = ?', [$email]));
     }
 
-    public function testNothingIsCommittedWhenTheFlushFails(): void
+    public function testNothingIsCommittedWhenTheFlushFailsAfterTheEventInsert(): void
     {
-        $existing = $this->newCustomer();
-        $this->emails[] = (string) $existing->getEmail();
-        $this->entityManager()->persist($existing);
+        $first = $this->newCustomer();
+        $second = $this->newCustomer();
+        $this->emails[] = (string) $first->getEmail();
+        $this->emails[] = (string) $second->getEmail();
+        $this->entityManager()->persist($first);
+        $this->entityManager()->persist($second);
         $this->entityManager()->flush();
         $eventsBefore = self::int($this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event'));
 
-        // Same e-mail: the unique index fails the flush after the event rows were written.
-        $duplicate = $this->newCustomer((string) $existing->getEmail());
-        $order = $this->newCompletedOrder($this->newCustomer());
-        $this->emails[] = (string) $order->getCustomer()?->getEmail();
+        // Doctrine runs the INSERTs (order, outbox event, deliveries) before the UPDATEs: the
+        // duplicate e-mail of the second customer fails the flush after the event was written.
+        $order = $this->newCompletedOrder($first);
         $this->entityManager()->persist($order);
-        $this->entityManager()->persist($duplicate);
+        $second->setEmail((string) $first->getEmail());
+        $second->setEmailCanonical((string) $first->getEmailCanonical());
+
+        $inserts = new class() {
+            public int $events = 0;
+
+            public function postPersist(PostPersistEventArgs $args): void
+            {
+                if ($args->getObject() instanceof OutboxEventInterface) {
+                    ++$this->events;
+                }
+            }
+        };
+        $eventManager = $this->entityManager()->getEventManager();
+        $eventManager->addEventListener([Events::postPersist], $inserts);
 
         try {
             $this->entityManager()->flush();
             self::fail('The flush should fail on the duplicate e-mail.');
         } catch (UniqueConstraintViolationException) {
+        } finally {
+            $eventManager->removeEventListener([Events::postPersist], $inserts);
         }
 
+        self::assertGreaterThan(0, $inserts->events, 'The order.placed row was inserted before the failure.');
         self::assertSame($eventsBefore, self::int($this->observer->fetchOne('SELECT COUNT(*) FROM tmonier_webhook_outbox_event')), 'No event committed when the flush fails.');
         self::assertFalse($this->observer->fetchOne('SELECT id FROM sylius_order WHERE number = ?', [$order->getNumber()]));
 
         $doctrine = self::getContainer()->get('doctrine');
         self::assertInstanceOf(ManagerRegistry::class, $doctrine);
         $doctrine->resetManager();
+    }
+
+    public function testAFailedRecordReleasesTheClaimAndTheWorkerRecovers(): void
+    {
+        $deliveryId = $this->committedDelivery();
+
+        $broken = $this->dispatcherWith(static fn (WebhookRequest $request): DeliveryAttempt => new DeliveryAttempt(new \DateTimeImmutable(), 3, 200, "\xB1\x31 invalid UTF-8"));
+
+        try {
+            $broken->dispatchNext();
+            self::fail('Recording an attempt that cannot be encoded must fail.');
+        } catch (\Throwable) {
+        }
+
+        $doctrine = self::getContainer()->get('doctrine');
+        self::assertInstanceOf(ManagerRegistry::class, $doctrine);
+        $entityManager = $doctrine->getManager();
+        self::assertInstanceOf(EntityManagerInterface::class, $entityManager);
+        self::assertTrue($entityManager->isOpen(), 'The closed entity manager was reset.');
+        $row = $this->deliveryRow($deliveryId);
+        self::assertNull($row['claim_token'], 'The claim was released.');
+        self::assertSame('pending', $row['status']);
+        self::assertSame(0, self::int($row['attempts']));
+
+        $delivery = $this->dispatcherWith(static fn (WebhookRequest $request): DeliveryAttempt => new DeliveryAttempt(new \DateTimeImmutable(), 3, 204))->dispatchNext();
+        self::assertNotNull($delivery);
+        self::assertSame('delivered', $this->deliveryRow($deliveryId)['status'], 'The same worker keeps sending.');
+    }
+
+    public function testALostLeaseDropsTheAttemptResult(): void
+    {
+        $deliveryId = $this->committedDelivery();
+        $observer = $this->observer;
+
+        // Another worker took the delivery over while the request was running.
+        $this->dispatcherWith(static function (WebhookRequest $request) use ($observer, $deliveryId): DeliveryAttempt {
+            $observer->update('tmonier_webhook_delivery', ['claim_token' => 'other-worker'], ['id' => $deliveryId]);
+
+            return new DeliveryAttempt(new \DateTimeImmutable(), 3, 500, 'late');
+        })->dispatchNext();
+
+        $row = $this->deliveryRow($deliveryId);
+        self::assertSame('other-worker', $row['claim_token'], 'The other worker keeps its lease.');
+        self::assertSame(0, self::int($row['attempts']), 'The late result is not recorded.');
+        self::assertSame('pending', $row['status']);
+    }
+
+    public function testAnErasureDuringTheRequestIsNotUndone(): void
+    {
+        $deliveryId = $this->committedDelivery();
+        $customerId = self::int($this->observer->fetchOne('SELECT e.customer_id FROM tmonier_webhook_outbox_event e JOIN tmonier_webhook_delivery d ON d.event_id = e.id WHERE d.id = ?', [$deliveryId]));
+
+        $this->dispatcherWith(static fn (WebhookRequest $request): DeliveryAttempt => new DeliveryAttempt(new \DateTimeImmutable(), 3, 500, 'echo: ada@example.com'))->dispatchNext();
+        $this->observer->executeStatement('UPDATE tmonier_webhook_delivery SET next_attempt_at = ? WHERE id = ?', ['2020-01-01 00:00:00', $deliveryId]);
+
+        // The erasure runs in another process (another connection) while the request is running:
+        // the worker's copy of the delivery still holds the old excerpt.
+        $observer = $this->observer;
+        $this->dispatcherWith(static function (WebhookRequest $request) use ($observer, $deliveryId, $customerId): DeliveryAttempt {
+            $observer->executeStatement('UPDATE tmonier_webhook_outbox_event SET anonymized_at = ? WHERE customer_id = ?', ['2026-10-11 00:00:00', $customerId]);
+            $history = json_decode(self::string($observer->fetchOne('SELECT attempt_history FROM tmonier_webhook_delivery WHERE id = ?', [$deliveryId])), true, flags: \JSON_THROW_ON_ERROR);
+            self::assertIsArray($history);
+            $erased = array_map(static fn (mixed $attempt): array => ['response_body' => null] + (is_array($attempt) ? $attempt : []), $history);
+            $observer->update('tmonier_webhook_delivery', ['attempt_history' => json_encode($erased), 'last_response_body' => null], ['id' => $deliveryId]);
+
+            return new DeliveryAttempt(new \DateTimeImmutable(), 3, 500, 'echo again: ada@example.com');
+        })->dispatchNext();
+
+        $row = $this->deliveryRow($deliveryId);
+        self::assertSame(2, self::int($row['attempts']), 'The attempt is recorded.');
+        self::assertNull($row['last_response_body'], 'No response excerpt of an anonymized event.');
+        $history = json_decode(self::string($row['attempt_history']), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($history);
+        self::assertSame([null, null], array_column($history, 'response_body'), 'The erased excerpt is not restored.');
+    }
+
+    public function testAClaimDoesNotBlockTheCheckoutNorTheOtherWorkers(): void
+    {
+        $this->committedDelivery();
+        $this->committedDelivery();
+        $claimer = self::getContainer()->get('tmonier_webhook.delivery_claimer');
+        self::assertInstanceOf(DeliveryClaimer::class, $claimer);
+
+        $platform = $this->connection()->getDatabasePlatform();
+        $isPostgres = $platform instanceof PostgreSQLPlatform;
+        $this->connection()->executeStatement($isPostgres ? "SET lock_timeout = '3s'" : 'SET SESSION innodb_lock_wait_timeout = 3');
+
+        $this->observer->beginTransaction();
+
+        try {
+            $held = $claimer->claimOn($this->observer);
+            self::assertNotNull($held, 'Worker B holds a claim in an open transaction.');
+
+            // A checkout meanwhile: inserts an event and its delivery.
+            $customer = $this->newCustomer();
+            $this->emails[] = (string) $customer->getEmail();
+            $this->entityManager()->persist($customer);
+            $this->entityManager()->flush();
+            self::assertNotNull($customer->getId(), 'The insert was not blocked by the claim.');
+
+            if ($claimer->isSkipLockedSupported()) {
+                $other = $claimer->claimNext();
+                self::assertNotNull($other, 'Worker A claims another delivery instead of nothing.');
+                self::assertNotSame($held->deliveryId, $other->deliveryId);
+            }
+        } finally {
+            $this->observer->rollBack();
+            $this->connection()->executeStatement($isPostgres ? 'SET lock_timeout = 0' : 'SET SESSION innodb_lock_wait_timeout = 50');
+        }
     }
 
     public function testConcurrentWorkersNeverClaimTheSameDelivery(): void
@@ -197,6 +341,59 @@ final class TransactionalOutboxTest extends KernelTestCase
         } finally {
             $this->observer->rollBack();
         }
+    }
+
+    /** Commits a customer: one pending customer.created delivery to the test endpoint. */
+    private function committedDelivery(): int
+    {
+        $customer = $this->newCustomer();
+        $this->emails[] = (string) $customer->getEmail();
+        $this->entityManager()->persist($customer);
+        $this->entityManager()->flush();
+
+        return self::int($this->observer->fetchOne(
+            'SELECT d.id FROM tmonier_webhook_delivery d JOIN tmonier_webhook_outbox_event e ON e.id = d.event_id WHERE e.type = ? AND e.resource_id = ?',
+            ['customer.created', (string) $this->idOf($customer)],
+        ));
+    }
+
+    /** @return array<string, mixed> */
+    private function deliveryRow(int $id): array
+    {
+        $row = $this->observer->fetchAssociative('SELECT * FROM tmonier_webhook_delivery WHERE id = ?', [$id]);
+        self::assertIsArray($row);
+
+        return $row;
+    }
+
+    /** @param \Closure(WebhookRequest): DeliveryAttempt $send */
+    private function dispatcherWith(\Closure $send): WebhookDispatcher
+    {
+        $container = self::getContainer();
+        $sender = new class($send) implements WebhookSenderInterface {
+            /** @param \Closure(WebhookRequest): DeliveryAttempt $send */
+            public function __construct(private readonly \Closure $send)
+            {
+            }
+
+            public function send(WebhookRequest $request): DeliveryAttempt
+            {
+                return ($this->send)($request);
+            }
+        };
+
+        $doctrine = $container->get('doctrine');
+        $claimer = $container->get('tmonier_webhook.delivery_claimer');
+        $retryPolicy = $container->get('tmonier_webhook.retry_policy');
+        $urlPolicy = $container->get('tmonier_webhook.url_policy');
+        $redactor = $container->get('tmonier_webhook.url_redactor');
+        self::assertInstanceOf(ManagerRegistry::class, $doctrine);
+        self::assertInstanceOf(DeliveryClaimer::class, $claimer);
+        self::assertInstanceOf(RetryPolicy::class, $retryPolicy);
+        self::assertInstanceOf(EndpointUrlPolicy::class, $urlPolicy);
+        self::assertInstanceOf(UrlRedactor::class, $redactor);
+
+        return new WebhookDispatcher($doctrine, $claimer, $sender, new WebhookSigner(), $retryPolicy, $urlPolicy, $redactor, new NativeClock(), new NullLogger(), WebhookDelivery::class);
     }
 
     /** @return list<array<string, mixed>> */

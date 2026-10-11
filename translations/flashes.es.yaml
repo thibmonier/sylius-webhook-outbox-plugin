@@ -5,5 +5,6 @@ tmonier_webhook:
     retry_scheduled: "El envío vence ahora: el worker lo enviará en su próxima ejecución."
     cannot_replay: "Solo se pueden reenviar los envíos entregados o fallidos definitivamente."
     cannot_replay_anonymized: "Este evento fue anonimizado: no se puede reenviar."
+    endpoint_disabled: "El endpoint está desactivado: actívelo primero."
     replay_scheduled: "Reenvío en cola con el mismo id de webhook."
     bulk_replay_done: "%replayed% envío(s) en cola para reenvío, %skipped% omitido(s) (pendientes, fallidos o anonimizados)."

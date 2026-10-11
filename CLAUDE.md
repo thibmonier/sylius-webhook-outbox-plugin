@@ -29,6 +29,8 @@ Databases: `tmonier_sylius_webhook_outbox_dev` / `_test`. The kernel cache lives
 
 ## Architecture
 
+- `src/Capture/EntityGuard` — detectors wrap each entity: a failure is logged with the entity
+  id and the other entities of the flush keep their events.
 - `src/Capture/OutboxCaptureListener` — `onFlush`: runs the tagged `ChangeDetectorInterface`
   services (`Capture/Detector/*`), the recorder `persist()`s + `computeChangeSet()`s the event
   and its deliveries. `postPersist` of an event: one DBAL `UPDATE` of `resource_id` /
@@ -40,10 +42,15 @@ Databases: `tmonier_sylius_webhook_outbox_dev` / `_test`. The kernel cache lives
 - `src/Payload` — own versioned DTO normalizers. Any field change must update
   `docs/schemas/*.json` (checked by `PayloadSchemaTest`) and the README. Never expose tokens,
   passwords, the order token or the customer IP.
-- `src/Delivery` — `DeliveryClaimer` (SKIP LOCKED + lease, falls back to FOR UPDATE when DBAL
-  says unsupported), `WebhookDispatcher`, `HttpWebhookSender`, `RetryPolicy`, `EnvelopeFactory`.
-- `src/Http` — SSRF client factory (`NoPrivateNetworkHttpClient`, no redirect), CIDR
-  subtraction, URL policy, URL redaction for logs and errors.
+- `src/Delivery` — `DeliveryClaimer` (plain candidate read, then SKIP LOCKED on one primary
+  key + lease; FOR UPDATE when DBAL says unsupported), `WebhookDispatcher` (entity manager
+  from the registry; on error: release the claim, reset a closed manager; re-read under the
+  row lock before recording), `HttpWebhookSender`, `RetryPolicy`, `EnvelopeFactory`.
+- `src/EventListener/EndpointAvailabilityListener` — disabling an endpoint suspends its open
+  deliveries, enabling it requeues them (postUpdate, DBAL, inside the transaction).
+- `src/Http` — SSRF client factory (`NoPrivateNetworkHttpClient`, no redirect, env proxies
+  ignored), CIDR subtraction, URL policy, `UrlRedactor` service (parse and rebuild; use it for
+  anything that shows or logs a URL).
 - `src/Signature` — Standard Webhooks signer and `whsec_` generator.
 - `src/Controller/Admin`, `src/EventListener/EndpointSecretListener` — the secret is shown only
   in the response to the create / regenerate POST (`SecretRevealer`, no-store); never flash,

@@ -37,6 +37,22 @@ final class EndpointHttpClientFactoryTest extends TestCase
         self::assertSame(200, $client->request('POST', 'https://93.184.215.14/hook')->getStatusCode());
     }
 
+    public function testEnvironmentProxiesAreIgnored(): void
+    {
+        $options = [];
+        $transport = new MockHttpClient(static function (string $method, string $url, array $requestOptions) use (&$options): MockResponse {
+            $options = $requestOptions;
+
+            return new MockResponse('ok');
+        });
+
+        EndpointHttpClientFactory::create($transport)->request('POST', 'https://93.184.215.14/hook')->getStatusCode();
+
+        self::assertSame('*', $options['no_proxy'] ?? null, 'A proxy would resolve the host itself and bypass the private network guard.');
+        self::assertNull($options['proxy'] ?? null);
+        self::assertSame(0, $options['max_redirects'] ?? null);
+    }
+
     public function testAllowedPrivateNetworkOnly(): void
     {
         $client = EndpointHttpClientFactory::create(new MockHttpClient([new MockResponse('ok'), new MockResponse('ok')]), ['10.0.12.0/24']);

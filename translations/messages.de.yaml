@@ -56,6 +56,7 @@ tmonier_webhook:
             failed: "Fehlgeschlagen, neuer Versuch geplant"
             delivered: "Zugestellt"
             dead: "Endgültig fehlgeschlagen"
+            suspended: "Ausgesetzt (Endpunkt deaktiviert)"
     event_type:
         order:
             placed: "Bestellung aufgegeben"

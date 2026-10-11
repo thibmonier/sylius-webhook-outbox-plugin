@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tmonier\SyliusWebhookOutboxPlugin\Delivery;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\DeliveryAttempt;
@@ -16,17 +17,24 @@ use Tmonier\SyliusWebhookOutboxPlugin\Signature\WebhookSigner;
 /**
  * Claims, signs, sends and records one delivery at a time. Logs never contain the secret, the
  * payload or the full URL.
+ *
+ * The attempt is recorded in a short transaction after the HTTP call, under the row lock of
+ * the delivery and only if the claim still belongs to this worker; the delivery is re-read
+ * under that lock so that an anonymization committed during the call is never undone. When
+ * recording fails, the claim is released and a closed entity manager is reset, so that a
+ * long-running worker keeps working.
  */
 final class WebhookDispatcher
 {
     /** @param class-string<WebhookDeliveryInterface> $deliveryClass */
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
+        private readonly ManagerRegistry $registry,
         private readonly DeliveryClaimer $claimer,
         private readonly WebhookSenderInterface $sender,
         private readonly WebhookSigner $signer,
         private readonly RetryPolicy $retryPolicy,
         private readonly EndpointUrlPolicy $urlPolicy,
+        private readonly UrlRedactor $urlRedactor,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
         private readonly string $deliveryClass,
@@ -41,28 +49,45 @@ final class WebhookDispatcher
             return null;
         }
 
-        $delivery = $this->entityManager->find($this->deliveryClass, $claim->deliveryId);
-        if (!$delivery instanceof WebhookDeliveryInterface) {
-            return null;
-        }
-        $this->entityManager->refresh($delivery);
+        try {
+            $entityManager = $this->entityManager();
+            $delivery = $entityManager->find($this->deliveryClass, $claim->deliveryId);
+            if (!$delivery instanceof WebhookDeliveryInterface) {
+                $this->claimer->release($claim);
 
-        $attempt = $this->attempt($delivery);
-
-        $recorded = $this->entityManager->wrapInTransaction(function () use ($claim, $delivery, $attempt): bool {
-            if (!$this->claimer->holds($claim)) {
-                // The lease expired and another worker took the delivery over: its result wins.
-                return false;
+                return null;
             }
-            $this->apply($delivery, $attempt);
-            $this->entityManager->flush();
+            $entityManager->refresh($delivery);
 
-            return true;
-        });
+            $attempt = $this->attempt($delivery);
+
+            $recorded = $entityManager->wrapInTransaction(function () use ($entityManager, $claim, $delivery, $attempt): bool {
+                if (!$this->claimer->holds($claim)) {
+                    // The lease expired and another worker took the delivery over: its result wins.
+                    return false;
+                }
+
+                // Re-read under the row lock: changes committed during the HTTP call win.
+                $entityManager->refresh($delivery);
+                $entityManager->refresh($delivery->getEvent());
+                if ($delivery->getEvent()->isAnonymized()) {
+                    $attempt = $attempt->withoutResponse();
+                }
+                $this->apply($delivery, $attempt);
+                $entityManager->flush();
+
+                return true;
+            });
+        } catch (\Throwable $exception) {
+            $this->releaseQuietly($claim);
+            $this->recover();
+
+            throw $exception;
+        }
 
         if (!$recorded) {
             $this->logger->warning('Webhook delivery {delivery}: lease lost, attempt result dropped.', ['delivery' => $claim->deliveryId]);
-            $this->entityManager->clear();
+            $entityManager->clear();
         }
 
         return $delivery;
@@ -75,6 +100,42 @@ final class WebhookDispatcher
         $this->apply($delivery, $attempt);
 
         return $attempt;
+    }
+
+    /**
+     * After an error: Doctrine closes the entity manager on any exception in a transaction;
+     * a closed manager is replaced, an open one is cleared.
+     */
+    public function recover(): void
+    {
+        $entityManager = $this->entityManager();
+        if ($entityManager->isOpen()) {
+            $entityManager->clear();
+
+            return;
+        }
+
+        $this->registry->resetManager();
+    }
+
+    private function releaseQuietly(DeliveryClaim $claim): void
+    {
+        try {
+            $this->claimer->release($claim);
+        } catch (\Throwable $exception) {
+            // The lease expires anyway.
+            $this->logger->warning('Webhook delivery {delivery}: claim not released ({message}).', ['delivery' => $claim->deliveryId, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    private function entityManager(): EntityManagerInterface
+    {
+        $entityManager = $this->registry->getManagerForClass($this->deliveryClass);
+        if (!$entityManager instanceof EntityManagerInterface) {
+            throw new \LogicException(sprintf('No Doctrine ORM entity manager for "%s".', $this->deliveryClass));
+        }
+
+        return $entityManager;
     }
 
     private function attempt(WebhookDeliveryInterface $delivery): DeliveryAttempt
@@ -109,7 +170,7 @@ final class WebhookDispatcher
             'event_type' => $delivery->getEvent()->getType(),
             'webhook_id' => $delivery->getEvent()->getId(),
             'endpoint' => $delivery->getEndpoint()->getId(),
-            'url' => UrlRedactor::redact((string) $delivery->getEndpoint()->getUrl()),
+            'url' => $this->urlRedactor->redact((string) $delivery->getEndpoint()->getUrl()),
             'status_code' => $attempt->statusCode,
             'attempt' => $delivery->getAttempts(),
         ];

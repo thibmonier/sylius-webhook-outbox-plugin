@@ -56,6 +56,9 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(30, RetryPolicy::parseRetryAfter('30', $now));
         self::assertSame(90, RetryPolicy::parseRetryAfter('Sun, 11 Oct 2026 10:01:30 GMT', $now));
         self::assertSame(0, RetryPolicy::parseRetryAfter('Sun, 11 Oct 2026 09:00:00 GMT', $now));
+        self::assertSame(90, RetryPolicy::parseRetryAfter('Sunday, 11-Oct-26 10:01:30 GMT', $now), 'RFC 850.');
+        self::assertSame(90, RetryPolicy::parseRetryAfter('Sun Oct 11 10:01:30 2026', $now), 'asctime.');
+        self::assertSame(90, RetryPolicy::parseRetryAfter('Sun Oct  11 10:01:30 2026', $now), 'asctime, padded day.');
         self::assertNull(RetryPolicy::parseRetryAfter('soon', $now));
         self::assertNull(RetryPolicy::parseRetryAfter(null, $now));
     }

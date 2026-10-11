@@ -83,11 +83,14 @@ final class RetryPolicy
             return (int) $header;
         }
 
-        $date = \DateTimeImmutable::createFromFormat('D, d M Y H:i:s \G\M\T', $header, new \DateTimeZone('GMT'));
-        if (false === $date) {
-            return null;
+        // RFC 9110 5.6.7: IMF-fixdate, then the obsolete RFC 850 and asctime formats.
+        foreach (['D, d M Y H:i:s \G\M\T', 'l, d-M-y H:i:s \G\M\T', 'D M j H:i:s Y'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!' . $format, preg_replace('/\s+/', ' ', $header) ?? $header, new \DateTimeZone('GMT'));
+            if (false !== $date) {
+                return max(0, $date->getTimestamp() - $now->getTimestamp());
+            }
         }
 
-        return max(0, $date->getTimestamp() - $now->getTimestamp());
+        return null;
     }
 }

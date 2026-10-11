@@ -6,6 +6,7 @@ namespace Tmonier\SyliusWebhookOutboxPlugin\Outbox;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
+use Symfony\Component\Uid\Uuid;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\RetryPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEventInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface;
@@ -17,6 +18,8 @@ final class OutboxRecorder implements OutboxRecorderInterface
 {
     /** Entity manager being flushed: set by the capture listener during onFlush. */
     private ?EntityManagerInterface $flushing = null;
+
+    private ?string $lastId = null;
 
     /**
      * @param class-string<OutboxEventInterface> $eventClass
@@ -63,6 +66,7 @@ final class OutboxRecorder implements OutboxRecorderInterface
             $event->resourceType,
             $event->resourceId,
             $event->customerId,
+            $this->nextId(),
         );
         $entityManager->persist($outboxEvent);
         if (null !== $this->flushing) {
@@ -80,6 +84,25 @@ final class OutboxRecorder implements OutboxRecorderInterface
         }
 
         return $outboxEvent;
+    }
+
+    /**
+     * UUIDv7, strictly increasing within the process: events of one flush (order.placed then
+     * order.paid) keep their order even inside the same millisecond, so that receivers can
+     * sort by id.
+     */
+    private function nextId(): string
+    {
+        $id = Uuid::v7()->toRfc4122();
+        for ($try = 0; null !== $this->lastId && strcmp($id, $this->lastId) <= 0 && $try < 1000; ++$try) {
+            $id = Uuid::v7()->toRfc4122();
+        }
+        if (null !== $this->lastId && strcmp($id, $this->lastId) <= 0) {
+            usleep(1000);
+            $id = Uuid::v7()->toRfc4122();
+        }
+
+        return $this->lastId = $id;
     }
 
     /**

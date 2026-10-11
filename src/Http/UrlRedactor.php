@@ -5,42 +5,75 @@ declare(strict_types=1);
 namespace Tmonier\SyliusWebhookOutboxPlugin\Http;
 
 /**
- * Endpoint URLs may carry credentials (user info, tokens in the query string): error messages
- * and logs only show scheme, host, port and path.
+ * Endpoint URLs often carry credentials: user info, tokens in the query string, or the path
+ * itself (Slack, Discord, Make, Zapier hooks). Logs, error messages and the admin panel only
+ * show the scheme, the host, the port and the path segments that do not look like tokens.
+ *
+ * URLs are parsed and rebuilt, never string-replaced: messages of the HTTP client quote them
+ * re-encoded.
  */
 final class UrlRedactor
 {
-    public static function redact(string $url): string
+    public const REDACTED = '[redacted]';
+
+    /**
+     * Path segments hidden by default: 8+ characters mixing letters and digits, or 24+ token
+     * characters.
+     */
+    public const DEFAULT_SECRET_SEGMENT_PATTERN = '/^(?=[^\/]*\d)(?=[^\/]*[A-Za-z])[A-Za-z0-9_\-.~]{8,}$|^[A-Za-z0-9_\-.~]{24,}$/';
+
+    private const URL_IN_TEXT = '~[a-z][a-z0-9+.\-]*://[^\s"\'<>`]+~i';
+
+    /** @param string|null $secretSegmentPattern null keeps every path segment */
+    public function __construct(private readonly ?string $secretSegmentPattern = self::DEFAULT_SECRET_SEGMENT_PATTERN)
+    {
+    }
+
+    public function redact(string $url): string
     {
         $parts = parse_url($url);
         if (false === $parts || !isset($parts['host'])) {
             return '[invalid url]';
         }
 
+        $path = '';
+        if (isset($parts['path']) && '' !== $parts['path']) {
+            $segments = array_map(
+                fn (string $segment): string => null !== $this->secretSegmentPattern && 1 === preg_match($this->secretSegmentPattern, $segment) ? self::REDACTED : $segment,
+                explode('/', $parts['path']),
+            );
+            $path = implode('/', $segments);
+        }
+
         return sprintf(
             '%s://%s%s%s%s',
-            $parts['scheme'] ?? 'https',
+            strtolower($parts['scheme'] ?? 'https'),
             $parts['host'],
             isset($parts['port']) ? ':' . $parts['port'] : '',
-            $parts['path'] ?? '',
-            isset($parts['query']) ? '?[redacted]' : '',
+            $path,
+            isset($parts['query']) ? '?' . self::REDACTED : '',
         );
     }
 
-    public static function redactMessage(string $message, string $url): string
+    /** Redacts every URL quoted in a message (the endpoint URL in any encoding included). */
+    public function redactMessage(string $message, string $url = ''): string
     {
-        $redacted = self::redact($url);
-        $message = str_replace([$url, rawurldecode($url)], $redacted, $message);
+        $redacted = preg_replace_callback(
+            self::URL_IN_TEXT,
+            fn (array $match): string => $this->redact(rtrim($match[0], '.,;:)')) . substr($match[0], strlen(rtrim($match[0], '.,;:)'))),
+            $message,
+        ) ?? '';
 
-        // Messages of the HTTP client sometimes quote the URL without its user info.
-        $parts = parse_url($url);
-        if (false !== $parts && isset($parts['query'])) {
-            $message = str_replace('?' . $parts['query'], '?[redacted]', $message);
-        }
-        if (false !== $parts && isset($parts['user'])) {
-            $message = str_replace($parts['user'] . (isset($parts['pass']) ? ':' . $parts['pass'] : '') . '@', '', $message);
+        // Credentials of the endpoint quoted without their URL (rare, but cheap to remove).
+        $parts = '' === $url ? false : parse_url($url);
+        if (false !== $parts) {
+            foreach ([$parts['user'] ?? null, $parts['pass'] ?? null, $parts['query'] ?? null] as $secret) {
+                if (null !== $secret && strlen($secret) >= 4) {
+                    $redacted = str_replace([$secret, rawurlencode($secret), rawurldecode($secret)], self::REDACTED, $redacted);
+                }
+            }
         }
 
-        return mb_substr($message, 0, 1000);
+        return mb_substr($redacted, 0, 1000);
     }
 }

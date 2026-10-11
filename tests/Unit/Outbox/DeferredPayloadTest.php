@@ -32,6 +32,23 @@ final class DeferredPayloadTest extends TestCase
         self::assertSame(42, $payload->toArray()['id']);
     }
 
+    public function testAnEarlyReadDoesNotFreezeUnresolvedIds(): void
+    {
+        $entity = new class() {
+            public ?int $id = null;
+
+            public function getId(): ?int
+            {
+                return $this->id;
+            }
+        };
+        $payload = new DeferredPayload(['id' => LazyValue::idOf($entity)]);
+
+        self::assertNull($payload->toArray()['id'], 'Read before the insert (a listener logging it).');
+        $entity->id = 9;
+        self::assertSame('{"id":9}', json_encode($payload), 'Encoded at insert time with the real id.');
+    }
+
     public function testKnownIdsAreUsedDirectly(): void
     {
         $entity = new class() {

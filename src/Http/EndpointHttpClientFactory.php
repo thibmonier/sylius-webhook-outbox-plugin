@@ -11,6 +11,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * The dedicated client of the deliveries: private networks blocked (resolved addresses
  * included, CVE-2024-50342), no redirect, idle timeout and maximum duration.
+ *
+ * Proxies from the environment (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY) are ignored: a proxy
+ * resolves the host itself, which would bypass the private network check.
  */
 final class EndpointHttpClientFactory
 {
@@ -27,6 +30,8 @@ final class EndpointHttpClientFactory
             'timeout' => $timeout,
             'max_duration' => $maxDuration,
             'max_redirects' => 0,
+            'proxy' => null,
+            'no_proxy' => '*',
         ]);
     }
 }

@@ -23,7 +23,10 @@ interface WebhookDeliveryInterface extends ResourceInterface
     /** No attempt left, or the endpoint answered 410 Gone (dead letter). */
     public const STATUS_DEAD = 'dead';
 
-    public const STATUSES = [self::STATUS_PENDING, self::STATUS_FAILED, self::STATUS_DELIVERED, self::STATUS_DEAD];
+    /** The endpoint is disabled: not attempted until it is enabled again. */
+    public const STATUS_SUSPENDED = 'suspended';
+
+    public const STATUSES = [self::STATUS_PENDING, self::STATUS_FAILED, self::STATUS_DELIVERED, self::STATUS_DEAD, self::STATUS_SUSPENDED];
 
     /** Number of attempts kept in the history. */
     public const HISTORY_SIZE = 10;

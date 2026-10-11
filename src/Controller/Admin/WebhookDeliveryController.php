@@ -45,6 +45,9 @@ final class WebhookDeliveryController
             return $this->toShow($request, $id, 'error', 'tmonier_webhook.invalid_csrf_token');
         }
 
+        if (!$delivery->getEndpoint()->isEnabled()) {
+            return $this->toShow($request, $id, 'error', 'tmonier_webhook.endpoint_disabled');
+        }
         if (!$delivery->retryNow($this->clock->now())) {
             return $this->toShow($request, $id, 'error', 'tmonier_webhook.cannot_retry');
         }
@@ -60,6 +63,9 @@ final class WebhookDeliveryController
             return $this->toShow($request, $id, 'error', 'tmonier_webhook.invalid_csrf_token');
         }
 
+        if (!$delivery->getEndpoint()->isEnabled()) {
+            return $this->toShow($request, $id, 'error', 'tmonier_webhook.endpoint_disabled');
+        }
         $replay = $this->replay($delivery);
         if (null === $replay) {
             return $this->toShow($request, $id, 'error', $delivery->getEvent()->isAnonymized() ? 'tmonier_webhook.cannot_replay_anonymized' : 'tmonier_webhook.cannot_replay');
@@ -108,7 +114,7 @@ final class WebhookDeliveryController
 
     private function replay(WebhookDeliveryInterface $delivery): ?WebhookDeliveryInterface
     {
-        if (!$delivery->canBeReplayed()) {
+        if (!$delivery->canBeReplayed() || !$delivery->getEndpoint()->isEnabled()) {
             return null;
         }
 

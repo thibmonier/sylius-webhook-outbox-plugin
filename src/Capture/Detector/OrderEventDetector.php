@@ -11,6 +11,7 @@ use Sylius\Component\Core\OrderCheckoutStates;
 use Sylius\Component\Core\OrderPaymentStates;
 use Sylius\Component\Core\OrderShippingStates;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\ChangeDetectorInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Capture\EntityGuard;
 use Tmonier\SyliusWebhookOutboxPlugin\EventType\CoreEventTypeProvider;
 use Tmonier\SyliusWebhookOutboxPlugin\Outbox\LazyValue;
 use Tmonier\SyliusWebhookOutboxPlugin\Outbox\WebhookEvent;
@@ -31,8 +32,10 @@ final class OrderEventDetector implements ChangeDetectorInterface
         CoreEventTypeProvider::ORDER_CANCELLED => ['state', OrderInterface::STATE_CANCELLED],
     ];
 
-    public function __construct(private readonly OrderPayloadNormalizer $normalizer)
-    {
+    public function __construct(
+        private readonly OrderPayloadNormalizer $normalizer,
+        private readonly EntityGuard $guard,
+    ) {
     }
 
     public function detect(EntityManagerInterface $entityManager, UnitOfWork $unitOfWork): iterable
@@ -48,8 +51,8 @@ final class OrderEventDetector implements ChangeDetectorInterface
                     $reached[] = $type;
                 }
             }
-            if ([] !== $reached && in_array(CoreEventTypeProvider::ORDER_PLACED, $reached, true)) {
-                yield from $this->events($order, $reached);
+            if (in_array(CoreEventTypeProvider::ORDER_PLACED, $reached, true)) {
+                yield from $this->guard->events($order, fn (): iterable => $this->events($order, $reached));
             }
         }
 
@@ -64,7 +67,9 @@ final class OrderEventDetector implements ChangeDetectorInterface
                     $reached[] = $type;
                 }
             }
-            yield from $this->events($order, $reached);
+            if ([] !== $reached) {
+                yield from $this->guard->events($order, fn (): iterable => $this->events($order, $reached));
+            }
         }
     }
 

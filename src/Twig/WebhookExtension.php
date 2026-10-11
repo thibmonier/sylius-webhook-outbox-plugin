@@ -22,10 +22,13 @@ final class WebhookExtension extends AbstractExtension
         WebhookDeliveryInterface::STATUS_FAILED => 'orange',
         WebhookDeliveryInterface::STATUS_DELIVERED => 'green',
         WebhookDeliveryInterface::STATUS_DEAD => 'red',
+        WebhookDeliveryInterface::STATUS_SUSPENDED => 'secondary',
     ];
 
-    public function __construct(private readonly EventTypeRegistryInterface $eventTypes)
-    {
+    public function __construct(
+        private readonly EventTypeRegistryInterface $eventTypes,
+        private readonly UrlRedactor $urlRedactor,
+    ) {
     }
 
     public function getFunctions(): array
@@ -43,7 +46,7 @@ final class WebhookExtension extends AbstractExtension
     public function getFilters(): array
     {
         return [
-            new TwigFilter('tmonier_webhook_redact_url', static fn (?string $url): string => null === $url ? '' : UrlRedactor::redact($url)),
+            new TwigFilter('tmonier_webhook_redact_url', fn (?string $url): string => null === $url ? '' : $this->urlRedactor->redact($url)),
             new TwigFilter('tmonier_webhook_pretty_body', self::prettyBody(...)),
         ];
     }

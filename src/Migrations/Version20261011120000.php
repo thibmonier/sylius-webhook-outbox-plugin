@@ -67,7 +67,7 @@ final class Version20261011120000 extends AbstractMigration
         $delivery->addColumn('claim_token', Types::STRING, ['length' => 64, 'notnull' => false]);
         $delivery->addColumn('replay_of', Types::INTEGER, ['notnull' => false]);
         $delivery->setPrimaryKey(['id']);
-        $delivery->addIndex(['status', 'next_attempt_at'], 'tmonier_webhook_delivery_due_idx');
+        $delivery->addIndex(['status', 'next_attempt_at', 'id'], 'tmonier_webhook_delivery_due_idx');
         $delivery->addIndex(['created_at'], 'tmonier_webhook_delivery_created_at_idx');
         $delivery->addIndex(['event_id'], 'IDX_38E5E40C71F7E88B');
         $delivery->addIndex(['endpoint_id'], 'IDX_38E5E40C21AF7E36');

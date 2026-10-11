@@ -5,5 +5,6 @@ tmonier_webhook:
     retry_scheduled: "Dostarczenie jest teraz wymagalne: worker wyśle je przy następnym uruchomieniu."
     cannot_replay: "Ponownie wysłać można tylko dostarczone lub trwale nieudane dostarczenia."
     cannot_replay_anonymized: "To zdarzenie zostało zanonimizowane: nie można go wysłać ponownie."
+    endpoint_disabled: "Endpoint jest wyłączony: najpierw go włącz."
     replay_scheduled: "Ponowne wysłanie w kolejce z tym samym id webhooka."
     bulk_replay_done: "%replayed% dostarczeń w kolejce do ponownego wysłania, %skipped% pominiętych (oczekujące, nieudane lub zanonimizowane)."

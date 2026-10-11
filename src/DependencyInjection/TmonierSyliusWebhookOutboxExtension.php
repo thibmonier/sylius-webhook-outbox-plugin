@@ -37,6 +37,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
         $container->setParameter('tmonier_webhook.response_body_max_bytes', $config['response_body_max_bytes']);
         $container->setParameter('tmonier_webhook.retention_days', $config['retention_days']);
         $container->setParameter('tmonier_webhook.allow_http_endpoints', $config['allow_http_endpoints']);
+        $container->setParameter('tmonier_webhook.url_redaction_pattern', $config['url_redaction_pattern']);
         $container->setParameter('tmonier_webhook.allowed_private_networks', array_values(array_unique($config['allowed_private_networks'])));
         // A claimed delivery is reclaimed when its worker did not report within this lease.
         $container->setParameter('tmonier_webhook.claim_lease', (int) ceil($config['max_duration']) + 60);
@@ -84,6 +85,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
      *     response_body_max_bytes: int,
      *     retention_days: int|null,
      *     allow_http_endpoints: bool,
+     *     url_redaction_pattern: string|null,
      *     allowed_private_networks: list<string>,
      *     driver: string,
      *     models: array<string, array{classes: array{model: class-string, interface: class-string, controller: class-string, factory: class-string, repository: class-string, form?: class-string}}>,

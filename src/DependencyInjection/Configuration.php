@@ -18,6 +18,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpoint;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Form\Type\WebhookEndpointType;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\OutboxEventRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookDeliveryRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookEndpointRepository;
@@ -85,6 +86,14 @@ final class Configuration implements ConfigurationInterface
                 ->booleanNode('allow_http_endpoints')
                     ->info('Accept plain http:// endpoint URLs. Development only: payloads and signatures travel in clear text.')
                     ->defaultFalse()
+                ->end()
+                ->scalarNode('url_redaction_pattern')
+                    ->info('Regular expression of the URL path segments hidden in logs, errors and the admin (tokens of Slack-like hook URLs). Null shows every segment. Query strings are always hidden.')
+                    ->defaultValue(UrlRedactor::DEFAULT_SECRET_SEGMENT_PATTERN)
+                    ->validate()
+                        ->ifTrue(static fn (mixed $pattern): bool => null !== $pattern && (!is_string($pattern) || false === @preg_match($pattern, '')))
+                        ->thenInvalid('url_redaction_pattern must be a valid regular expression or null, %s given.')
+                    ->end()
                 ->end()
                 ->arrayNode('allowed_private_networks')
                     ->info('CIDR ranges that endpoints may reach although they are private (e.g. an ERP on 10.0.12.0/24). Everything else private stays blocked.')

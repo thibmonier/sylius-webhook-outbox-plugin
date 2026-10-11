@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tmonier\SyliusWebhookOutboxPlugin\Command;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -27,8 +26,8 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
 
     public function __construct(
         private readonly WebhookDispatcher $dispatcher,
-        private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
+        private readonly float $maxDuration = 30,
     ) {
         parent::__construct();
     }
@@ -41,8 +40,9 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Stop after this number of deliveries (0: no limit)', '0')
             ->addOption('sleep', null, InputOption::VALUE_REQUIRED, 'Seconds to wait when nothing is due (--loop)', '1')
             ->setHelp(<<<'HELP'
-                Cron, every minute (a run never overlaps the next one):
-                  <info>* * * * * php bin/console tmonier:webhook:dispatch --time-limit=55</info>
+                Cron, every minute: no request starts later than --time-limit minus max_duration
+                (30 s by default), and flock skips a run while the previous one is still busy:
+                  <info>* * * * * flock -n /tmp/sylius-webhooks.lock php bin/console tmonier:webhook:dispatch --time-limit=55</info>
 
                 Long-running worker (systemd / supervisor restart it after --time-limit):
                   <info>php bin/console tmonier:webhook:dispatch --loop --time-limit=3600</info>
@@ -69,13 +69,19 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
         $timeLimit = self::positiveInt($input->getOption('time-limit'));
         $limit = self::positiveInt($input->getOption('limit'));
         $sleep = max(0.1, (float) self::numeric($input->getOption('sleep')));
+        if ($timeLimit > 0 && $timeLimit < $this->maxDuration + 5) {
+            $output->writeln(sprintf('<error>--time-limit must be at least max_duration + 5 s (%d s).</error>', (int) ceil($this->maxDuration + 5)));
+
+            return Command::INVALID;
+        }
         $deadline = $timeLimit > 0 ? microtime(true) + $timeLimit : null;
 
         $sent = 0;
         $counts = array_fill_keys(WebhookDeliveryInterface::STATUSES, 0);
 
         while (!$this->shouldStop) {
-            if (null !== $deadline && microtime(true) >= $deadline) {
+            // Never start a request that could outlive the time limit (cron runs must not overlap).
+            if (null !== $deadline && microtime(true) + $this->maxDuration + 5 >= $deadline) {
                 break;
             }
             if ($limit > 0 && $sent >= $limit) {
@@ -86,8 +92,8 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
                 $delivery = $this->dispatcher->dispatchNext();
             } catch (\Throwable $exception) {
                 // Database hiccup: log, keep the worker alive, back off.
+                // The dispatcher released the claim and reset a closed entity manager.
                 $this->logger->error('Webhook worker error: {message}', ['message' => $exception->getMessage(), 'exception' => $exception]);
-                $this->entityManager->clear();
                 if (!$loop) {
                     return Command::FAILURE;
                 }
@@ -119,7 +125,7 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
                 ));
             }
             // Long-running process: do not keep every delivery in memory.
-            $this->entityManager->clear();
+            $this->dispatcher->recover();
         }
 
         $output->writeln(sprintf(

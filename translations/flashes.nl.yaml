@@ -5,5 +5,6 @@ tmonier_webhook:
     retry_scheduled: "De levering is nu verschuldigd: de worker verzendt ze bij de volgende run."
     cannot_replay: "Alleen afgeleverde of definitief mislukte leveringen kunnen opnieuw worden verzonden."
     cannot_replay_anonymized: "Deze gebeurtenis is geanonimiseerd: ze kan niet opnieuw worden verzonden."
+    endpoint_disabled: "Het endpoint is uitgeschakeld: schakel het eerst in."
     replay_scheduled: "Herhaling in de wachtrij met dezelfde webhook-id."
     bulk_replay_done: "%replayed% levering(en) in de wachtrij voor herhaling, %skipped% overgeslagen (in afwachting, mislukt of geanonimiseerd)."

@@ -56,6 +56,7 @@ tmonier_webhook:
             failed: "Nieudane, ponowienie zaplanowane"
             delivered: "Dostarczone"
             dead: "Trwale nieudane"
+            suspended: "Wstrzymane (endpoint wyłączony)"
     event_type:
         order:
             placed: "Zamówienie złożone"

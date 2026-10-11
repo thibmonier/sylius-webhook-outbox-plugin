@@ -8,6 +8,7 @@ use Symfony\Component\HttpClient\HttpClient;
 use Tmonier\SyliusWebhookOutboxPlugin\Controller\Admin\SecretRevealer;
 use Tmonier\SyliusWebhookOutboxPlugin\Controller\Admin\WebhookDeliveryController;
 use Tmonier\SyliusWebhookOutboxPlugin\Controller\Admin\WebhookEndpointController;
+use Tmonier\SyliusWebhookOutboxPlugin\EventListener\EndpointAvailabilityListener;
 use Tmonier\SyliusWebhookOutboxPlugin\EventListener\EndpointSecretListener;
 use Tmonier\SyliusWebhookOutboxPlugin\Form\Type\WebhookEndpointType;
 use Tmonier\SyliusWebhookOutboxPlugin\Menu\AdminMenuListener;
@@ -16,6 +17,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Validator\EndpointUrlValidator;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\Detector\CustomerEventDetector;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\Detector\OrderEventDetector;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\Detector\StockChangedDetector;
+use Tmonier\SyliusWebhookOutboxPlugin\Capture\EntityGuard;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\OutboxCaptureListener;
 use Tmonier\SyliusWebhookOutboxPlugin\Command\AnonymizeCustomerWebhooksCommand;
 use Tmonier\SyliusWebhookOutboxPlugin\Command\DispatchWebhooksCommand;
@@ -30,6 +32,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\EventType\EventTypeRegistry;
 use Tmonier\SyliusWebhookOutboxPlugin\EventType\EventTypeRegistryInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointHttpClientFactory;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
 use Tmonier\SyliusWebhookOutboxPlugin\Maintenance\CustomerWebhookDataAnonymizer;
 use Tmonier\SyliusWebhookOutboxPlugin\Maintenance\PayloadRedactor;
 use Tmonier\SyliusWebhookOutboxPlugin\Outbox\OutboxRecorder;
@@ -110,18 +113,23 @@ return static function (ContainerConfigurator $container): void {
     $services->alias(OutboxRecorderInterface::class, 'tmonier_webhook.outbox_recorder')->public();
 
     $services
+        ->set('tmonier_webhook.capture.entity_guard', EntityGuard::class)
+        ->args([service('logger')])
+        ->tag('monolog.logger', ['channel' => 'tmonier_webhook'])
+    ;
+    $services
         ->set('tmonier_webhook.change_detector.order', OrderEventDetector::class)
-        ->args([service('tmonier_webhook.payload.order')])
+        ->args([service('tmonier_webhook.payload.order'), service('tmonier_webhook.capture.entity_guard')])
         ->tag('tmonier_webhook.change_detector', ['priority' => 300])
     ;
     $services
         ->set('tmonier_webhook.change_detector.customer', CustomerEventDetector::class)
-        ->args([service('tmonier_webhook.payload.customer')])
+        ->args([service('tmonier_webhook.payload.customer'), service('tmonier_webhook.capture.entity_guard')])
         ->tag('tmonier_webhook.change_detector', ['priority' => 200])
     ;
     $services
         ->set('tmonier_webhook.change_detector.stock', StockChangedDetector::class)
-        ->args([service('tmonier_webhook.payload.product_variant')])
+        ->args([service('tmonier_webhook.payload.product_variant'), service('tmonier_webhook.capture.entity_guard')])
         ->tag('tmonier_webhook.change_detector', ['priority' => 100])
     ;
     $services
@@ -142,6 +150,10 @@ return static function (ContainerConfigurator $container): void {
         ->set('tmonier_webhook.signer', WebhookSigner::class)
     ;
     $services->set('tmonier_webhook.secret_generator', SecretGenerator::class);
+    $services
+        ->set('tmonier_webhook.url_redactor', UrlRedactor::class)
+        ->args([param('tmonier_webhook.url_redaction_pattern')])
+    ;
     $services
         ->set('tmonier_webhook.url_policy', EndpointUrlPolicy::class)
         ->args([param('tmonier_webhook.allow_http_endpoints')])
@@ -170,6 +182,7 @@ return static function (ContainerConfigurator $container): void {
             service('tmonier_webhook.http_client'),
             service('clock'),
             param('tmonier_webhook.response_body_max_bytes'),
+            service('tmonier_webhook.url_redactor'),
         ])
     ;
     $services->alias(WebhookSenderInterface::class, 'tmonier_webhook.sender');
@@ -177,7 +190,7 @@ return static function (ContainerConfigurator $container): void {
     $services
         ->set('tmonier_webhook.delivery_claimer', DeliveryClaimer::class)
         ->args([
-            service('doctrine.orm.entity_manager'),
+            service('doctrine'),
             service('clock'),
             param('tmonier_webhook.model.webhook_delivery.class'),
             param('tmonier_webhook.model.webhook_endpoint.class'),
@@ -187,17 +200,27 @@ return static function (ContainerConfigurator $container): void {
     $services
         ->set('tmonier_webhook.dispatcher', WebhookDispatcher::class)
         ->args([
-            service('doctrine.orm.entity_manager'),
+            service('doctrine'),
             service('tmonier_webhook.delivery_claimer'),
             service('tmonier_webhook.sender'),
             service('tmonier_webhook.signer'),
             service('tmonier_webhook.retry_policy'),
             service('tmonier_webhook.url_policy'),
+            service('tmonier_webhook.url_redactor'),
             service('clock'),
             service('logger'),
             param('tmonier_webhook.model.webhook_delivery.class'),
         ])
         ->tag('monolog.logger', ['channel' => 'tmonier_webhook'])
+    ;
+
+    $services
+        ->set('tmonier_webhook.listener.endpoint_availability', EndpointAvailabilityListener::class)
+        ->args([
+            service('clock'),
+            param('tmonier_webhook.model.webhook_delivery.class'),
+        ])
+        ->tag('doctrine.event_listener', ['event' => 'postUpdate'])
     ;
 
     // Maintenance
@@ -273,7 +296,10 @@ return static function (ContainerConfigurator $container): void {
     ;
     $services
         ->set('tmonier_webhook.twig.extension', WebhookExtension::class)
-        ->args([service('tmonier_webhook.event_type_registry')])
+        ->args([
+            service('tmonier_webhook.event_type_registry'),
+            service('tmonier_webhook.url_redactor'),
+        ])
         ->tag('twig.extension')
     ;
 
@@ -282,8 +308,8 @@ return static function (ContainerConfigurator $container): void {
         ->set('tmonier_webhook.command.dispatch', DispatchWebhooksCommand::class)
         ->args([
             service('tmonier_webhook.dispatcher'),
-            service('doctrine.orm.entity_manager'),
             service('logger'),
+            param('tmonier_webhook.max_duration'),
         ])
         ->tag('console.command')
         ->tag('monolog.logger', ['channel' => 'tmonier_webhook'])

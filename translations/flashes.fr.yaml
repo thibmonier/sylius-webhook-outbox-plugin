@@ -5,5 +5,6 @@ tmonier_webhook:
     retry_scheduled: "L’envoi est dû maintenant : le worker l’enverra à son prochain passage."
     cannot_replay: "Seuls les envois livrés ou en échec définitif peuvent être rejoués."
     cannot_replay_anonymized: "Cet événement a été anonymisé : il ne peut pas être rejoué."
+    endpoint_disabled: "L’endpoint est désactivé : activez-le d’abord."
     replay_scheduled: "Rejeu en file d’attente avec le même identifiant de webhook."
-    bulk_replay_done: "%replayed% envoi(s) en file pour rejeu, %skipped% ignoré(s) (en attente, en échec ou anonymisés)."
+    bulk_replay_done: "%replayed% envoi(s) en file pour rejeu, %skipped% ignoré(s) (en attente, en échec, anonymisés ou endpoint désactivé)."

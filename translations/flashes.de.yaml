@@ -5,5 +5,6 @@ tmonier_webhook:
     retry_scheduled: "Die Zustellung ist jetzt fällig: Der Worker sendet sie beim nächsten Lauf."
     cannot_replay: "Nur zugestellte oder endgültig fehlgeschlagene Zustellungen können erneut gesendet werden."
     cannot_replay_anonymized: "Dieses Ereignis wurde anonymisiert: Es kann nicht erneut gesendet werden."
+    endpoint_disabled: "Der Endpunkt ist deaktiviert: Aktivieren Sie ihn zuerst."
     replay_scheduled: "Erneutes Senden mit derselben Webhook-ID eingereiht."
     bulk_replay_done: "%replayed% Zustellung(en) zum erneuten Senden eingereiht, %skipped% übersprungen (ausstehend, fehlgeschlagen oder anonymisiert)."

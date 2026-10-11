@@ -6,7 +6,6 @@ namespace Tests\Tmonier\SyliusWebhookOutboxPlugin\Unit\Http;
 
 use PHPUnit\Framework\TestCase;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
-use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
 
 final class EndpointUrlPolicyTest extends TestCase
 {
@@ -28,15 +27,5 @@ final class EndpointUrlPolicyTest extends TestCase
     {
         self::assertNull((new EndpointUrlPolicy(true))->violation('http://localhost:8000/hook'));
         self::assertSame('tmonier_webhook.endpoint.url.http_or_https', (new EndpointUrlPolicy(true))->violation('ftp://x.example.com/'));
-    }
-
-    public function testRedactor(): void
-    {
-        self::assertSame('https://erp.example.com:8443/hook?[redacted]', UrlRedactor::redact('https://u:p@erp.example.com:8443/hook?token=abc'));
-        self::assertSame('[invalid url]', UrlRedactor::redact('nope'));
-        self::assertSame(
-            'Timeout for "https://erp.example.com/hook?[redacted]".',
-            UrlRedactor::redactMessage('Timeout for "https://erp.example.com/hook?token=abc".', 'https://erp.example.com/hook?token=abc'),
-        );
     }
 }

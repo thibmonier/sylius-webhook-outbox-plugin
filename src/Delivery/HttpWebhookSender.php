@@ -23,6 +23,7 @@ final class HttpWebhookSender implements WebhookSenderInterface
         private readonly HttpClientInterface $httpClient,
         private readonly ClockInterface $clock,
         private readonly int $responseBodyMaxBytes = 2048,
+        private readonly UrlRedactor $urlRedactor = new UrlRedactor(),
     ) {
     }
 
@@ -40,7 +41,7 @@ final class HttpWebhookSender implements WebhookSenderInterface
             $retryAfter = RetryPolicy::parseRetryAfter($response->getHeaders(false)['retry-after'][0] ?? null, $at);
             $body = $this->readBody($response);
         } catch (ExceptionInterface $exception) {
-            return new DeliveryAttempt($at, self::elapsedMs($start), null, null, UrlRedactor::redactMessage($exception->getMessage(), $request->url));
+            return new DeliveryAttempt($at, self::elapsedMs($start), null, null, $this->urlRedactor->redactMessage($exception->getMessage(), $request->url));
         }
 
         return new DeliveryAttempt($at, self::elapsedMs($start), $statusCode, $body, null, $retryAfter);

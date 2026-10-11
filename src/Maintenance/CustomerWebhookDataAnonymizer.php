@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tmonier\SyliusWebhookOutboxPlugin\Maintenance;
 
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Repository\OutboxEventRepositoryInterface;
@@ -28,29 +29,39 @@ final class CustomerWebhookDataAnonymizer
     ) {
     }
 
-    /** @return int number of anonymized events */
+    /**
+     * One transaction; delivery rows are locked (FOR UPDATE) and re-read before their
+     * responses are erased, so that a worker recording an attempt at the same time neither
+     * loses its attempt nor restores the erased responses (it re-reads under the same lock).
+     *
+     * @return int number of anonymized events
+     */
     public function anonymize(int $customerId): int
     {
         $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
-        $count = 0;
 
-        foreach ($this->eventRepository->findByCustomerId($customerId) as $event) {
-            if ($event->isAnonymized()) {
-                continue;
+        return (int) $this->entityManager->wrapInTransaction(function () use ($customerId, $now): int {
+            $count = 0;
+            foreach ($this->eventRepository->findByCustomerId($customerId) as $event) {
+                if ($event->isAnonymized()) {
+                    continue;
+                }
+
+                /** @var array<string, mixed> $payload */
+                $payload = $this->redactor->redact($event->getPayload());
+                $event->replacePayload($payload);
+                $event->markAnonymized($now);
+                foreach ($this->deliveryRepository->findByEvent($event) as $delivery) {
+                    $this->entityManager->lock($delivery, LockMode::PESSIMISTIC_WRITE);
+                    $this->entityManager->refresh($delivery);
+                    $delivery->eraseResponses();
+                }
+                ++$count;
             }
 
-            /** @var array<string, mixed> $payload */
-            $payload = $this->redactor->redact($event->getPayload());
-            $event->replacePayload($payload);
-            $event->markAnonymized($now);
-            foreach ($this->deliveryRepository->findByEvent($event) as $delivery) {
-                $delivery->eraseResponses();
-            }
-            ++$count;
-        }
+            $this->entityManager->flush();
 
-        $this->entityManager->flush();
-
-        return $count;
+            return $count;
+        });
     }
 }

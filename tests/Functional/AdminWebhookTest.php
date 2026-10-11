@@ -258,6 +258,35 @@ final class AdminWebhookTest extends WebTestCase
         self::assertTrue($replay->isDue(new \DateTimeImmutable('+1 second')));
     }
 
+    public function testDisabledEndpointsCannotBePingedNorReplayed(): void
+    {
+        $this->loginAdmin();
+        $dead = $this->deadDelivery();
+        $endpointId = $this->idOf($dead->getEndpoint());
+        $crawler = $this->client->request('GET', sprintf('/admin/webhooks/deliveries/%d', $this->idOf($dead)));
+        $replayForm = $crawler->filter('[data-test-tmonier-webhook-replay]')->closest('form');
+        self::assertNotNull($replayForm);
+        $crawler = $this->client->request('GET', sprintf('/admin/webhooks/endpoints/%d/edit', $endpointId));
+        $pingForm = $crawler->filter('[data-test-tmonier-webhook-ping]')->closest('form');
+        self::assertNotNull($pingForm);
+
+        // Reloaded after the requests: the kernel resets the entity manager between them.
+        $endpoint = $this->entityManager()->find(WebhookEndpoint::class, $endpointId);
+        self::assertInstanceOf(WebhookEndpointInterface::class, $endpoint);
+        $endpoint->setEnabled(false);
+        $this->entityManager()->flush();
+        self::assertSame(0, self::int($this->connection()->fetchOne('SELECT enabled FROM tmonier_webhook_endpoint WHERE id = ?', [$this->idOf($endpoint)])));
+
+        $this->client->submit($replayForm->form());
+        $crawler = $this->client->followRedirect();
+        self::assertSame(['The endpoint is disabled: enable it first.'], $this->flashes($crawler));
+
+        $this->client->submit($pingForm->form());
+        $crawler = $this->client->followRedirect();
+        self::assertSame(['The endpoint is disabled: enable it first.'], $this->flashes($crawler));
+        self::assertCount(1, $this->deliveriesOf($endpoint), 'Nothing queued.');
+    }
+
     public function testBulkReplaySkipsWhatCannotBeReplayed(): void
     {
         $this->loginAdmin();
@@ -278,7 +307,7 @@ final class AdminWebhookTest extends WebTestCase
 
         self::assertResponseRedirects('/admin/webhooks/dead-letters');
         $crawler = $this->client->followRedirect();
-        self::assertSame(['1 delivery(ies) queued for replay, 1 skipped (pending, failed or anonymized).'], $this->flashes($crawler));
+        self::assertSame(['1 delivery(ies) queued for replay, 1 skipped (pending, failed, anonymized or endpoint disabled).'], $this->flashes($crawler));
         self::assertCount(3, $this->deliveriesOf($dead->getEndpoint()));
     }
 

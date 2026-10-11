@@ -12,7 +12,7 @@ a customer signs up, when stock moves. Sylius 2 has no outgoing webhooks, and th
 changes that were rolled back, and leaves no trace.
 
 This plugin writes each event **in the same database transaction** as the change that caused
-it (the outbox), then a worker delivers it with a signed HTTP request, retries for a day,
+it (the outbox), then a worker delivers it with a signed HTTP request, retries for about three days,
 parks what still fails in a dead-letter list and lets an administrator replay it. It is free
 and open source.
 
@@ -24,7 +24,7 @@ and open source.
 | Know what happened in the shop | `order.placed`, `order.paid`, `order.cancelled`, `order.shipped`, `customer.created`, `customer.updated` (whitelisted fields only), `product_variant.stock_changed` (**one event per flush**, not per order line), `webhook.ping`. |
 | Stable, documented payloads | A versioned envelope `{id, type, version, timestamp, channel, data}`; `data` comes from the plugin's own normalizers (no API Platform dump), never contains passwords, tokens or the order token. [JSON Schemas](docs/schemas) included. |
 | Trust the sender | [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md) v1 signatures (`webhook-id`, `webhook-timestamp`, `webhook-signature: v1,<base64>`, `whsec_` secrets), tested against the vectors of the specification. Receiver snippets for PHP and Node below. |
-| Survive receiver outages | Database-driven retries: immediately, 5 s, 5 min, 30 min, 2 h, 5 h, 10 h, 14 h, 20 h, 24 h (+ jitter). `Retry-After` honoured on 429/502/503/504. `410 Gone` disables the endpoint. After the last attempt the delivery is **dead** (dead-letter list). |
+| Survive receiver outages | Database-driven retries: immediately, 5 s, 5 min, 30 min, 2 h, 5 h, 10 h, 14 h, 20 h, 24 h (+ jitter). `Retry-After` honoured on 429/502/503/504 (all HTTP-date formats). `410 Gone` disables the endpoint and suspends its other deliveries. After the last attempt (about 3 days and 4 hours after the event) the delivery is **dead** (dead-letter list). |
 | Operate it | **Integrations › Webhook endpoints / Webhook deliveries / Dead letters** in the admin: endpoint CRUD (secret shown **once**, regenerate, ping), deliveries grid with filters, delivery page (request body, truncated response, last 10 attempts), **Retry now**, **Replay** (single and bulk, same `webhook-id`). |
 | Stay safe | Dedicated HTTP client: private and link-local networks blocked after DNS resolution (`NoPrivateNetworkHttpClient`), no redirects, https only, 15 s idle timeout, 30 s maximum duration. Secrets never logged nor shown again. |
 | Run it anywhere | `tmonier:webhook:dispatch` works from cron (`--time-limit`) or as a long-running worker (`--loop`); claims use `SELECT … FOR UPDATE SKIP LOCKED` and a lease, so a crashed worker's delivery is picked up again. |
@@ -108,6 +108,7 @@ tmonier_sylius_webhook_outbox:
     retention_days: 30               # default of tmonier:webhook:purge (null: keep forever)
     allow_http_endpoints: false      # accept http:// URLs: development only
     allowed_private_networks: []     # e.g. ['10.0.12.0/24'] for an ERP on your LAN
+    url_redaction_pattern: '…'       # path segments hidden in logs / errors / admin (null: none)
 ```
 
 An event is stored only when at least one enabled endpoint subscribes to it (and accepts its
@@ -125,12 +126,15 @@ blocked, including after DNS resolution. Use exact ranges.
 | `order.shipped` | `shippingState` becomes `shipped` | order | order channel |
 | `order.cancelled` | `state` becomes `cancelled` | order | order channel |
 | `customer.created` | a customer is created (guests included: Sylius creates one per checkout e-mail) | [customer](docs/schemas/customer.v1.json) | null |
-| `customer.updated` | e-mail, first / last name, phone, gender, birthday, group or newsletter changes; `changed_fields` lists them | customer | null |
-| `product_variant.stock_changed` | `onHand` or `onHold` of variants changes; **one event per flush** listing every variant | [stock](docs/schemas/product_variant.stock_changed.v1.json) | null |
+| `customer.updated` | e-mail, first / last name, phone, gender, birthday, group or newsletter changes, or an existing customer (a former guest) creates an account (`has_account`); `changed_fields` lists them | customer | null |
+| `product_variant.stock_changed` | `onHand` or `onHold` of variants changes, or a tracked variant is created (initial stock, `previous` null); **one event per flush** listing every variant | [stock](docs/schemas/product_variant.stock_changed.v1.json) | null |
 | `webhook.ping` | **Ping** button; sent to that endpoint only | [ping](docs/schemas/webhook.ping.v1.json) | null |
 
 Several events of one flush are independent: a receiver can get `order.paid` before
-`order.placed` after a retry. Order by `timestamp` and use the state fields of `data`.
+`order.placed` after a retry. `timestamp` has a one-second precision and is the same for the
+events of one flush: order events by `id` instead (UUIDv7, time-ordered; the plugin makes the
+ids of one process strictly increasing, so `order.placed` sorts before the `order.paid` of the
+same flush), and rely on the state fields of `data`.
 
 ### Envelope
 
@@ -233,7 +237,8 @@ Each request is a `POST` with `Content-Type: application/json` and three headers
 (`v1,<base64 HMAC-SHA256>`, possibly several separated by spaces). The signed content is
 `{webhook-id}.{webhook-timestamp}.{raw body}`, the key is the base64-decoded part of the
 `whsec_…` secret. Answer `2xx` quickly (within 15 s) and process asynchronously; any other
-answer is retried, `410 Gone` disables the endpoint.
+answer is retried, `410 Gone` disables the endpoint (its pending deliveries are suspended
+until an administrator enables it again).
 
 Any [Standard Webhooks library](https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries)
 works. Without a library:
@@ -318,7 +323,8 @@ CREATE TABLE sylius_webhooks_received (webhook_id CHAR(36) PRIMARY KEY, received
 -- INSERT ... ; on duplicate key: already processed, answer 200 and do nothing.
 ```
 
-Keep the ids at least as long as the retry window (24 h) plus the time an administrator may
+Keep the ids at least as long as the retry window (the sum of `retry_schedule`: about 3 days
+and 4 hours by default, up to 10% more with the jitter) plus the time an administrator may
 replay (the retention, 30 days by default).
 
 ## Workers
@@ -338,10 +344,12 @@ It finishes the delivery in progress on `SIGTERM` / `SIGINT`. A worker killed in
 a request leaves a lease that expires; the delivery is then sent again (receivers deduplicate
 with `webhook-id`).
 
-**Cron** (every minute, a run never overlaps the next one):
+**Cron** (every minute). The worker never starts a request later than `--time-limit` minus
+`max_duration` minus 5 s (so `--time-limit` must be at least 35 s with the defaults), and
+`flock -n` skips a run while the previous one is still busy:
 
 ```cron
-* * * * * cd /var/www/shop && php bin/console tmonier:webhook:dispatch --time-limit=55 >> var/log/webhooks.log 2>&1
+* * * * * cd /var/www/shop && flock -n var/webhooks.lock php bin/console tmonier:webhook:dispatch --time-limit=55 >> var/log/webhooks.log 2>&1
 ```
 
 **systemd** (`/etc/systemd/system/sylius-webhooks.service`):
@@ -387,6 +395,13 @@ for each other: run a single worker, or set `server_version` to your real versio
 | `tmonier:webhook:purge [--days=N] [--dry-run]` | deletes the events older than N days (default `retention_days`) with their deliveries; events with a delivery still pending or failed are kept |
 | `tmonier:webhook:anonymize-customer <id or e-mail>` | redacts the personal data of the customer's events (payloads) and removes the response excerpts of their deliveries |
 
+## Disabled endpoints
+
+When an endpoint is disabled (by an administrator or after `410 Gone`), its pending and failed
+deliveries become **suspended**: not attempted, not dead letters, and purgeable after the
+retention. Enabling the endpoint again requeues them. Ping, replay and retry are refused while
+the endpoint is disabled.
+
 ## Personal data
 
 Webhook payloads contain personal data (names, e-mails, addresses). Before adding an endpoint,
@@ -406,11 +421,25 @@ Retries still pending are sent with the redacted payload.
 
 - Generated by the plugin (`whsec_` + 32 random bytes), shown **once**, in the answer to the
   creation or regeneration request (`Cache-Control: no-store`), never stored in the session,
-  never displayed again, never logged; endpoint URLs are logged and shown without their query
-  string.
+  never displayed again, never logged.
 - Stored in clear in `tmonier_webhook_endpoint.secret` (they are needed to sign): protect
   database dumps accordingly.
 - Regenerating replaces the secret immediately (no overlap period in this version).
+- Endpoint URLs are often credentials too (query tokens, Slack / Make / Zapier style paths).
+  Logs, recorded errors and the admin grids and pages show them rebuilt without user info,
+  without query string and without the path segments that look like tokens
+  (`url_redaction_pattern`: 8+ characters mixing letters and digits, or 24+ characters).
+  Only the endpoint edit form shows the full URL.
+
+## Network safety
+
+The deliveries use a dedicated HTTP client: private, loopback and link-local addresses are
+refused after DNS resolution (`NoPrivateNetworkHttpClient`, symfony/http-client 6.4.15+ for
+the CVE-2024-50342 fix), redirects are not followed, `http://` is refused unless
+`allow_http_endpoints`. **Proxy environment variables (`HTTP_PROXY`, `HTTPS_PROXY`,
+`ALL_PROXY`) are ignored by this client**: a proxy resolves the host itself and would bypass
+the check. If your servers can only reach the Internet through a proxy, the webhooks cannot be
+sent from them in this version.
 - **With tmonier/sylius-audit-log-plugin**: the endpoint entity is not audited by default. If
   you add it to `tmonier_sylius_audit_log.resources`, keep the default
   `masked_field_patterns` (`/secret/i`): the trail then records that the secret changed, never
@@ -482,6 +511,7 @@ ORM 2.20 and 3.6, and the alternatives that were rejected.
 - Changes made without the Doctrine ORM (DBAL or SQL queries, bulk DQL `UPDATE`) produce no
   event.
 - At-least-once delivery, no ordering guarantee between events (no per-endpoint serial queue).
+- Webhooks cannot go through an HTTP proxy (see [Network safety](#network-safety)).
 - Capture errors (a bug in a normalizer) are logged as critical and do not block the checkout:
   the business change wins.
 - One secret per endpoint, no overlap when regenerating; no ed25519 (`v1a`) signatures.

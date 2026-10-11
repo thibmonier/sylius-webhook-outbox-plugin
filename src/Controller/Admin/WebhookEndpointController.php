@@ -54,6 +54,10 @@ final class WebhookEndpointController
             return $this->back($request, 'error', 'tmonier_webhook.invalid_csrf_token');
         }
 
+        if (!$endpoint->isEnabled()) {
+            return $this->back($request, 'error', 'tmonier_webhook.endpoint_disabled');
+        }
+
         $this->recorder->record(new WebhookEvent(
             CoreEventTypeProvider::WEBHOOK_PING,
             ['endpoint_id' => $endpoint->getId(), 'endpoint_name' => $endpoint->getName(), 'message' => 'Ping from Sylius'],

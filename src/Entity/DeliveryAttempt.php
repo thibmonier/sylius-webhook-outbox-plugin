@@ -22,6 +22,12 @@ final class DeliveryAttempt
     ) {
     }
 
+    /** Same attempt without the response excerpt (anonymized event). */
+    public function withoutResponse(): self
+    {
+        return new self($this->at, $this->durationMs, $this->statusCode, null, $this->error, $this->retryAfterSeconds, $this->permanentFailure);
+    }
+
     public function isSuccessful(): bool
     {
         return null !== $this->statusCode && $this->statusCode >= 200 && $this->statusCode < 300;

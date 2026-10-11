@@ -139,6 +139,7 @@ sylius_grid:
                             tmonier_webhook.ui.status.failed: failed
                             tmonier_webhook.ui.status.delivered: delivered
                             tmonier_webhook.ui.status.dead: dead
+                            tmonier_webhook.ui.status.suspended: suspended
                 endpoint:
                     type: entity
                     label: tmonier_webhook.ui.endpoint

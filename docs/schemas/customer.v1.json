@@ -96,7 +96,8 @@
                     "gender",
                     "birthday",
                     "group",
-                    "subscribed_to_newsletter"
+                    "subscribed_to_newsletter",
+                    "has_account"
                 ]
             },
             "description": "customer.updated only"

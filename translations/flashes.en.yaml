@@ -5,5 +5,6 @@ tmonier_webhook:
     retry_scheduled: "The delivery is due now: the worker sends it on its next run."
     cannot_replay: "Only delivered or dead deliveries can be replayed."
     cannot_replay_anonymized: "This event was anonymized: it cannot be replayed."
+    endpoint_disabled: "The endpoint is disabled: enable it first."
     replay_scheduled: "Replay queued with the same webhook id."
-    bulk_replay_done: "%replayed% delivery(ies) queued for replay, %skipped% skipped (pending, failed or anonymized)."
+    bulk_replay_done: "%replayed% delivery(ies) queued for replay, %skipped% skipped (pending, failed, anonymized or endpoint disabled)."

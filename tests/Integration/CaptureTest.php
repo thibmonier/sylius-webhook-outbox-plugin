@@ -179,4 +179,104 @@ final class CaptureTest extends KernelTestCase
         $this->entityManager()->flush();
         self::assertCount(1, $this->deliveriesOf($endpoint));
     }
+
+    public function testNewTrackedVariantsPublishTheirInitialStock(): void
+    {
+        $this->createEndpoint(['product_variant.stock_changed']);
+        /** @var \Sylius\Resource\Factory\FactoryInterface<\Sylius\Component\Core\Model\ProductVariantInterface> $factory */
+        $factory = self::getContainer()->get('sylius.factory.product_variant');
+        $variant = $factory->createNew();
+        $variant->setCode($this->unique('VARIANT'));
+        $variant->setProduct($this->trackedVariant()->getProduct());
+        $variant->setTracked(true);
+        $variant->setOnHand(12);
+        $this->entityManager()->persist($variant);
+        $this->entityManager()->flush();
+
+        $events = $this->eventsOfType('product_variant.stock_changed');
+        self::assertCount(1, $events);
+        $lines = $events[0]->getPayload()['variants'];
+        self::assertIsArray($lines);
+        self::assertSame([[
+            'id' => $this->idOf($variant),
+            'on_hand' => 12,
+            'previous' => ['on_hand' => null, 'on_hold' => null],
+        ]], array_map(static fn (mixed $line): array => is_array($line) ? ['id' => $line['id'], 'on_hand' => $line['on_hand'], 'previous' => $line['previous']] : [], $lines));
+    }
+
+    public function testAnExistingCustomerSigningUpGivesCustomerUpdated(): void
+    {
+        $this->createEndpoint(['customer.updated']);
+        $customer = $this->newCustomer();
+        $this->entityManager()->persist($customer);
+        $this->entityManager()->flush();
+
+        /** @var \Sylius\Resource\Factory\FactoryInterface<\Sylius\Component\Core\Model\ShopUserInterface> $factory */
+        $factory = self::getContainer()->get('sylius.factory.shop_user');
+        $user = $factory->createNew();
+        $user->setCustomer($customer);
+        $user->setPlainPassword('sylius-webhook');
+        $user->setEnabled(true);
+        $this->entityManager()->persist($user);
+        $this->entityManager()->flush();
+
+        $events = $this->eventsOfType('customer.updated', (string) $this->idOf($customer));
+        self::assertCount(1, $events);
+        self::assertSame(['has_account'], $events[0]->getPayload()['changed_fields']);
+        self::assertTrue($events[0]->getPayload()['has_account']);
+    }
+
+    public function testEventIdsIncreaseWithinAFlush(): void
+    {
+        $this->createEndpoint(['customer.created']);
+        $customers = [];
+        for ($i = 0; $i < 20; ++$i) {
+            $customers[] = $customer = $this->newCustomer();
+            $this->entityManager()->persist($customer);
+        }
+        $this->entityManager()->flush();
+
+        $ids = [];
+        foreach ($customers as $customer) {
+            $ids[] = $this->eventsOfType('customer.created', (string) $this->idOf($customer))[0]->getId();
+        }
+        $sorted = $ids;
+        sort($sorted);
+        self::assertSame($sorted, $ids, 'UUIDv7 ids follow the recording order (receivers sort by id).');
+        self::assertCount(20, array_unique($ids));
+    }
+
+    public function testDisablingAnEndpointSuspendsItsOpenDeliveries(): void
+    {
+        $endpoint = $this->createEndpoint(['customer.created']);
+        $this->entityManager()->persist($this->newCustomer());
+        $this->entityManager()->persist($this->newCustomer());
+        $this->entityManager()->flush();
+        [$delivered, $open] = $this->deliveriesOf($endpoint);
+        $delivered->markDelivered(new \DateTimeImmutable());
+        $this->entityManager()->flush();
+
+        $endpoint->disable('410 Gone', new \DateTimeImmutable());
+        $this->entityManager()->flush();
+        $this->entityManager()->clear();
+        self::assertSame(
+            ['delivered', 'suspended'],
+            array_map(static fn (WebhookDeliveryInterface $delivery): string => $delivery->getStatus(), $this->deliveriesOf($endpoint)),
+        );
+
+        // Suspended deliveries do not block the purge.
+        $this->connection()->executeStatement('UPDATE tmonier_webhook_outbox_event SET occurred_at = ? WHERE id = ?', ['2020-01-01 00:00:00', $open->getEvent()->getId()]);
+        $repository = self::getContainer()->get('tmonier_webhook.repository.outbox_event');
+        self::assertInstanceOf(\Tmonier\SyliusWebhookOutboxPlugin\Repository\OutboxEventRepositoryInterface::class, $repository);
+        self::assertSame(1, $repository->countPurgeableBefore(new \DateTimeImmutable('-1 day')));
+
+        $endpoint = $this->entityManager()->find($endpoint::class, $this->idOf($endpoint));
+        self::assertInstanceOf(\Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface::class, $endpoint);
+        $endpoint->setEnabled(true);
+        $this->entityManager()->flush();
+        $this->entityManager()->clear();
+        $deliveries = $this->deliveriesOf($endpoint);
+        self::assertSame('pending', $deliveries[1]->getStatus(), 'Requeued when the endpoint is enabled again.');
+        self::assertTrue($deliveries[1]->isDue(new \DateTimeImmutable('+1 second')));
+    }
 }

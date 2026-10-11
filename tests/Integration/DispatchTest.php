@@ -217,10 +217,19 @@ final class DispatchTest extends KernelTestCase
 
         self::assertNotNull(self::$kernel);
         $tester = new CommandTester((new Application(self::$kernel))->find('tmonier:webhook:dispatch'));
-        $tester->execute(['--time-limit' => '20']);
+        $tester->execute(['--time-limit' => '120']);
 
         $tester->assertCommandIsSuccessful();
         self::assertStringContainsString('3 attempt(s): 2 delivered, 1 to retry, 0 dead.', $tester->getDisplay());
+    }
+
+    public function testTimeLimitMustLeaveRoomForOneRequest(): void
+    {
+        self::assertNotNull(self::$kernel);
+        $tester = new CommandTester((new Application(self::$kernel))->find('tmonier:webhook:dispatch'));
+
+        self::assertSame(2, $tester->execute(['--time-limit' => '20']));
+        self::assertStringContainsString('--time-limit must be at least max_duration + 5 s (35 s).', $tester->getDisplay());
     }
 
     /** @return array{WebhookEndpointInterface, WebhookDeliveryInterface} */
