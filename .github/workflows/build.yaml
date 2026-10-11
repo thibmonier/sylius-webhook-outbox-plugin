@@ -59,6 +59,9 @@ jobs:
 
         env:
             APP_ENV: test
+            # The test application pins server_version 5.7: give DBAL the real version so that the
+            # delivery claim uses SELECT ... FOR UPDATE SKIP LOCKED (tests/TestApplication/config).
+            DATABASE_SERVER_VERSION: "${{ startsWith(matrix.database, 'mariadb') && 'mariadb-11.4.0' || (startsWith(matrix.database, 'postgres') && '17' || '8.4.0') }}"
 
         steps:
             -

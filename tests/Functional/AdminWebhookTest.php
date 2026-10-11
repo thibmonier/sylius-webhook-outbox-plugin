@@ -197,6 +197,7 @@ final class AdminWebhookTest extends WebTestCase
         $this->client->request('GET', '/admin/webhooks/endpoints/');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', (string) $endpoint->getName());
+        self::assertSelectorExists(sprintf('a[href*="criteria%%5Bendpoint%%5D=%d"]', $this->idOf($endpoint)), 'Link to the deliveries of the endpoint.');
     }
 
     public function testPagesHaveNoUntranslatedKey(): void

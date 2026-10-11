@@ -36,3 +36,14 @@ when@test:
         tmonier_webhook.http_client.transport:
             class: Symfony\Component\HttpClient\MockHttpClient
             arguments: ['@Tests\Tmonier\SyliusWebhookOutboxPlugin\Http\WebhookReceiverStub']
+
+# Development helper: bin/console tmonier:webhook:demo
+services:
+    Tests\Tmonier\SyliusWebhookOutboxPlugin\Command\GenerateDemoWebhooksCommand:
+        arguments:
+            $entityManager: '@doctrine.orm.entity_manager'
+            $recorder: '@tmonier_webhook.outbox_recorder'
+            $orderNormalizer: '@tmonier_webhook.payload.order'
+            $customerNormalizer: '@tmonier_webhook.payload.customer'
+            $secretGenerator: '@tmonier_webhook.secret_generator'
+        tags: ['console.command']
