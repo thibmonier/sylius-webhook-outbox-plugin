@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping">
+
+    <!--
+        Written by OutboxRecorder inside the flush of the business change (onFlush, persist +
+        computeChangeSet): the row is committed if and only if the change is committed.
+        No foreign key to the subject: the event outlives orders and customers.
+    -->
+    <mapped-superclass name="Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEvent" table="tmonier_webhook_outbox_event">
+        <indexes>
+            <index name="tmonier_webhook_outbox_event_occurred_at_idx" columns="occurred_at" />
+            <index name="tmonier_webhook_outbox_event_type_idx" columns="type" />
+            <index name="tmonier_webhook_outbox_event_resource_idx" columns="resource_type,resource_id" />
+            <index name="tmonier_webhook_outbox_event_customer_idx" columns="customer_id" />
+        </indexes>
+
+        <id name="id" column="id" type="string" length="36" />
+
+        <field name="type" column="type" type="string" length="100" />
+        <field name="version" column="version" type="integer" />
+        <field name="occurredAt" column="occurred_at" type="datetime_immutable" />
+        <field name="channelCode" column="channel_code" type="string" length="255" nullable="true" />
+        <field name="resourceType" column="resource_type" type="string" length="64" nullable="true" />
+        <field name="resourceId" column="resource_id" type="string" length="64" nullable="true" />
+        <field name="customerId" column="customer_id" type="integer" nullable="true" />
+        <field name="payload" column="payload" type="json" />
+        <field name="anonymizedAt" column="anonymized_at" type="datetime_immutable" nullable="true" />
+    </mapped-superclass>
+
+</doctrine-mapping>

@@ -1,0 +1,8 @@
+# Import this file from your application's config/routes:
+#
+# tmonier_sylius_webhook_outbox:
+#     resource: "@TmonierSyliusWebhookOutboxPlugin/config/routes.yaml"
+
+tmonier_webhook_admin:
+    resource: "@TmonierSyliusWebhookOutboxPlugin/config/routes/admin.yaml"
+    prefix: '/%sylius_admin.path_name%'

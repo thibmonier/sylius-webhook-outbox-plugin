@@ -1,0 +1,38 @@
+imports:
+    - { resource: "@TmonierSyliusWebhookOutboxPlugin/config/config.yaml" }
+
+twig:
+    paths:
+        '%kernel.project_dir%/../../../tests/TestApplication/templates': ~
+
+parameters:
+    # The test application pins MySQL 5.7, where DBAL has no SKIP LOCKED: the CI sets the real
+    # version of each database (see .github/workflows/build.yaml).
+    env(DATABASE_SERVER_VERSION): '5.7'
+
+doctrine:
+    dbal:
+        server_version: '%env(DATABASE_SERVER_VERSION)%'
+    orm:
+        entity_managers:
+            default:
+                mappings:
+                    TestApplication:
+                        is_bundle: false
+                        type: attribute
+                        dir: '%kernel.project_dir%/../../../tests/TestApplication/src/Entity'
+                        prefix: Tests\Tmonier\SyliusWebhookOutboxPlugin
+
+when@test:
+    tmonier_sylius_webhook_outbox:
+        # No jitter: retry dates are asserted exactly.
+        retry_jitter: 0
+
+    services:
+        # Offline receiver: tests queue the responses and read the requests.
+        Tests\Tmonier\SyliusWebhookOutboxPlugin\Http\WebhookReceiverStub:
+            public: true
+
+        tmonier_webhook.http_client.transport:
+            class: Symfony\Component\HttpClient\MockHttpClient
+            arguments: ['@Tests\Tmonier\SyliusWebhookOutboxPlugin\Http\WebhookReceiverStub']

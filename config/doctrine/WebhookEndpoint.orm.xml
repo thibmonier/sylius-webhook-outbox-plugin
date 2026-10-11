@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:gedmo="http://gediminasm.org/schemas/orm/doctrine-extensions-mapping">
+
+    <mapped-superclass name="Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpoint" table="tmonier_webhook_endpoint">
+        <id name="id" column="id" type="integer">
+            <generator strategy="AUTO" />
+        </id>
+
+        <field name="name" column="name" type="string" length="255" />
+        <field name="url" column="url" type="string" length="2048" />
+        <field name="description" column="description" type="text" nullable="true" />
+        <!-- Needed in clear to sign the requests; never logged nor shown after creation. -->
+        <field name="secret" column="secret" type="string" length="255" />
+        <field name="enabled" column="enabled" type="boolean" />
+        <field name="eventTypes" column="event_types" type="json" />
+        <field name="channelCodes" column="channel_codes" type="json" />
+        <field name="disabledAt" column="disabled_at" type="datetime" nullable="true" />
+        <field name="disabledReason" column="disabled_reason" type="string" length="255" nullable="true" />
+        <field name="createdAt" column="created_at" type="datetime">
+            <gedmo:timestampable on="create" />
+        </field>
+        <field name="updatedAt" column="updated_at" type="datetime" nullable="true">
+            <gedmo:timestampable on="update" />
+        </field>
+    </mapped-superclass>
+
+</doctrine-mapping>
