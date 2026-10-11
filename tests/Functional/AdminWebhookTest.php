@@ -275,7 +275,7 @@ final class AdminWebhookTest extends WebTestCase
         self::assertInstanceOf(WebhookEndpointInterface::class, $endpoint);
         $endpoint->setEnabled(false);
         $this->entityManager()->flush();
-        self::assertSame(0, self::int($this->connection()->fetchOne('SELECT enabled FROM tmonier_webhook_endpoint WHERE id = ?', [$this->idOf($endpoint)])));
+        self::assertFalse($this->bool($this->connection()->fetchOne('SELECT enabled FROM tmonier_webhook_endpoint WHERE id = ?', [$this->idOf($endpoint)])));
 
         $this->client->submit($replayForm->form());
         $crawler = $this->client->followRedirect();

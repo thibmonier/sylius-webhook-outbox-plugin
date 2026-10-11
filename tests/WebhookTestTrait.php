@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Tmonier\SyliusWebhookOutboxPlugin;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\CustomerInterface;
@@ -165,6 +166,15 @@ trait WebhookTestTrait
         self::assertIsNumeric($value);
 
         return (int) $value;
+    }
+
+    /** Boolean column read with raw DBAL: 0/1 on MySQL, true/false on PostgreSQL. */
+    private function bool(mixed $value): bool
+    {
+        $converted = $this->connection()->convertToPHPValue($value, Types::BOOLEAN);
+        self::assertIsBool($converted);
+
+        return $converted;
     }
 
     private static function string(mixed $value): string

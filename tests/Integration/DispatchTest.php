@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tmonier\SyliusWebhookOutboxPlugin\Integration;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
@@ -159,7 +160,7 @@ final class DispatchTest extends KernelTestCase
         // A checkout whose snapshot predates the disable fanned out to the endpoint anyway:
         // the endpoint is disabled behind the ORM (no listener), the delivery stays pending.
         [$endpoint, $delivery] = $this->pendingDelivery();
-        $this->connection()->update('tmonier_webhook_endpoint', ['enabled' => 0], ['id' => $endpoint->getId()]);
+        $this->connection()->update('tmonier_webhook_endpoint', ['enabled' => false], ['id' => $endpoint->getId()], ['enabled' => Types::BOOLEAN]);
         $this->connection()->executeStatement('UPDATE tmonier_webhook_outbox_event SET occurred_at = ? WHERE id = ?', ['2020-01-01 00:00:00', $delivery->getEvent()->getId()]);
 
         $events = self::getContainer()->get('tmonier_webhook.repository.outbox_event');
@@ -176,7 +177,7 @@ final class DispatchTest extends KernelTestCase
         $this->entityManager()->persist($this->newCustomer());
         $this->entityManager()->flush();
         $second = $this->deliveriesOf($endpoint)[1];
-        $this->connection()->update('tmonier_webhook_endpoint', ['enabled' => 0], ['id' => $endpoint->getId()]);
+        $this->connection()->update('tmonier_webhook_endpoint', ['enabled' => false], ['id' => $endpoint->getId()], ['enabled' => Types::BOOLEAN]);
         $this->connection()->update('tmonier_webhook_delivery', ['status' => 'delivered'], ['id' => $second->getId()]);
 
         $doctrine = self::getContainer()->get('doctrine');

@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Events;
@@ -372,7 +373,7 @@ final class TransactionalOutboxTest extends KernelTestCase
             $worker->close();
         }
 
-        self::assertSame(1, self::int($this->observer->fetchOne('SELECT enabled FROM tmonier_webhook_endpoint WHERE id = ?', [$this->endpointIds[0]])));
+        self::assertTrue($this->bool($this->observer->fetchOne('SELECT enabled FROM tmonier_webhook_endpoint WHERE id = ?', [$this->endpointIds[0]])));
         self::assertNotSame('suspended', $this->deliveryRow($deliveryId)['status'], 'Not suspended on an enabled endpoint.');
 
         // And a delivery left suspended on an enabled endpoint is requeued by the next run.
@@ -385,7 +386,7 @@ final class TransactionalOutboxTest extends KernelTestCase
     {
         $deliveryId = $this->committedDelivery();
         $this->observer->update('tmonier_webhook_delivery', ['claimed_until' => '2099-01-01 00:00:00', 'claim_token' => 'busy-worker'], ['id' => $deliveryId]);
-        $this->observer->update('tmonier_webhook_endpoint', ['enabled' => 0], ['id' => $this->endpointIds[0]]);
+        $this->observer->update('tmonier_webhook_endpoint', ['enabled' => false], ['id' => $this->endpointIds[0]], ['enabled' => Types::BOOLEAN]);
         $claimer = self::getContainer()->get('tmonier_webhook.delivery_claimer');
         self::assertInstanceOf(DeliveryClaimer::class, $claimer);
 
