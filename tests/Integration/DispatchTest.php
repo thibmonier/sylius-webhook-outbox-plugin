@@ -4,14 +4,28 @@ declare(strict_types=1);
 
 namespace Tests\Tmonier\SyliusWebhookOutboxPlugin\Integration;
 
+use Doctrine\Persistence\ManagerRegistry;
+use Psr\Log\AbstractLogger;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Tests\Tmonier\SyliusWebhookOutboxPlugin\WebhookTestTrait;
+use Tmonier\SyliusWebhookOutboxPlugin\Command\DispatchWebhooksCommand;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\DeliveryClaimer;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\RetryPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookDispatcher;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookRequest;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookSenderInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\DeliveryAttempt;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
+use Tmonier\SyliusWebhookOutboxPlugin\Repository\OutboxEventRepositoryInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Signature\WebhookSigner;
 
 /**
@@ -117,6 +131,80 @@ final class DispatchTest extends KernelTestCase
         $this->entityManager()->refresh($endpoint);
         self::assertFalse($endpoint->isEnabled());
         self::assertSame('410 Gone', $endpoint->getDisabledReason());
+    }
+
+    public function testGoneSuspendsTheOtherDeliveriesOfTheEndpoint(): void
+    {
+        [$endpoint] = $this->pendingDelivery();
+        $this->entityManager()->persist($this->newCustomer());
+        $this->entityManager()->persist($this->newCustomer());
+        $this->entityManager()->flush();
+        self::assertCount(3, $this->deliveriesOf($endpoint));
+        $this->receiver()->queue(new MockResponse('', ['http_code' => 410]));
+
+        self::assertNotNull($this->dispatcher()->dispatchNext());
+        self::assertNull($this->dispatcher()->dispatchNext(), 'Nothing left to send to a gone endpoint.');
+
+        $this->entityManager()->clear();
+        self::assertSame(
+            ['dead', 'suspended', 'suspended'],
+            array_map(static fn (WebhookDeliveryInterface $delivery): string => $delivery->getStatus(), $this->deliveriesOf($endpoint)),
+        );
+        self::assertCount(1, $this->receiver()->requests());
+    }
+
+    public function testOpenDeliveriesOfADisabledEndpointAreSuspendedByTheWorker(): void
+    {
+        // A checkout whose snapshot predates the disable fanned out to the endpoint anyway:
+        // the endpoint is disabled behind the ORM (no listener), the delivery stays pending.
+        [$endpoint, $delivery] = $this->pendingDelivery();
+        $this->connection()->update('tmonier_webhook_endpoint', ['enabled' => 0], ['id' => $endpoint->getId()]);
+        $this->connection()->executeStatement('UPDATE tmonier_webhook_outbox_event SET occurred_at = ? WHERE id = ?', ['2020-01-01 00:00:00', $delivery->getEvent()->getId()]);
+
+        $events = self::getContainer()->get('tmonier_webhook.repository.outbox_event');
+        self::assertInstanceOf(OutboxEventRepositoryInterface::class, $events);
+        self::assertSame(1, $events->countPurgeableBefore(new \DateTimeImmutable('-1 day')), 'Does not block the purge.');
+
+        self::assertNull($this->dispatcher()->dispatchNext());
+        self::assertSame('suspended', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$delivery->getId()]));
+    }
+
+    public function testLogsAndErrorsNeverContainTheUrlCredentials(): void
+    {
+        $this->pendingDelivery('https://93.184.215.14/services/T0123ABCD/B0456EFGH/aBcDeFgHiJkLmNoPqRsTuVwX?token=s3cr3t');
+        $this->receiver()->queue(new MockResponse('', ['error' => 'Idle timeout reached for "https://93.184.215.14/services/T0123ABCD/B0456EFGH/aBcDeFgHiJkLmNoPqRsTuVwX?token=s3cr3t".']));
+        $logger = new class() extends AbstractLogger {
+            public string $written = '';
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                unset($context['exception']);
+                $this->written .= $message . ' ' . json_encode($context, \JSON_UNESCAPED_SLASHES) . "\n";
+            }
+        };
+        $container = self::getContainer();
+        $doctrine = $container->get('doctrine');
+        $claimer = $container->get('tmonier_webhook.delivery_claimer');
+        $sender = $container->get('tmonier_webhook.sender');
+        $retryPolicy = $container->get('tmonier_webhook.retry_policy');
+        $urlPolicy = $container->get('tmonier_webhook.url_policy');
+        $redactor = $container->get('tmonier_webhook.url_redactor');
+        self::assertInstanceOf(ManagerRegistry::class, $doctrine);
+        self::assertInstanceOf(DeliveryClaimer::class, $claimer);
+        self::assertInstanceOf(WebhookSenderInterface::class, $sender);
+        self::assertInstanceOf(RetryPolicy::class, $retryPolicy);
+        self::assertInstanceOf(EndpointUrlPolicy::class, $urlPolicy);
+        self::assertInstanceOf(UrlRedactor::class, $redactor);
+        $dispatcher = new WebhookDispatcher($doctrine, $claimer, $sender, new WebhookSigner(), $retryPolicy, $urlPolicy, $redactor, new NativeClock(), $logger, WebhookDelivery::class);
+
+        $processed = $dispatcher->dispatchNext();
+
+        self::assertNotNull($processed);
+        self::assertStringContainsString('93.184.215.14/services/', $logger->written);
+        foreach (['T0123ABCD', 'B0456EFGH', 'aBcDeFgHiJkLmNoPqRsTuVwX', 's3cr3t'] as $secret) {
+            self::assertStringNotContainsString($secret, $logger->written, 'Log context');
+            self::assertStringNotContainsString($secret, (string) $processed->getLastError(), 'Recorded error');
+        }
     }
 
     public function testNetworkErrorsAreRetriedWithoutLeakingTheQueryString(): void
@@ -228,8 +316,77 @@ final class DispatchTest extends KernelTestCase
         self::assertNotNull(self::$kernel);
         $tester = new CommandTester((new Application(self::$kernel))->find('tmonier:webhook:dispatch'));
 
-        self::assertSame(2, $tester->execute(['--time-limit' => '20']));
-        self::assertStringContainsString('--time-limit must be at least max_duration + 5 s (35 s).', $tester->getDisplay());
+        self::assertSame(2, $tester->execute(['--time-limit' => '30']));
+        self::assertStringContainsString('--time-limit must be greater than max_duration (30 s)', $tester->getDisplay());
+    }
+
+    public function testTheRunStopsClaimingWhenARequestCouldOutliveTheTimeLimit(): void
+    {
+        for ($i = 0; $i < 5; ++$i) {
+            $this->pendingDelivery();
+        }
+        $sent = 0;
+        $command = $this->commandWith(1.0, static function () use (&$sent): void {
+            ++$sent;
+            usleep(450_000);
+        });
+
+        $start = microtime(true);
+        $tester = new CommandTester($command);
+        $tester->execute(['--time-limit' => '2']);
+        $elapsed = microtime(true) - $start;
+
+        $tester->assertCommandIsSuccessful();
+        self::assertGreaterThanOrEqual(1, $sent);
+        self::assertLessThan(5, $sent, 'No claim during the last max_duration seconds.');
+        self::assertLessThan(2.0, $elapsed, 'The last request ends before the time limit.');
+    }
+
+    public function testTheSmallestTimeLimitStillSends(): void
+    {
+        $this->pendingDelivery();
+        $this->pendingDelivery();
+        $sent = 0;
+        $tester = new CommandTester($this->commandWith(1.0, static function () use (&$sent): void {
+            ++$sent;
+        }));
+
+        $tester->execute(['--time-limit' => '2']);
+
+        $tester->assertCommandIsSuccessful();
+        self::assertSame(3, $sent, 'Every due delivery (the first endpoint also got the second event).');
+    }
+
+    /** @param \Closure(): void $onSend */
+    private function commandWith(float $maxDuration, \Closure $onSend): DispatchWebhooksCommand
+    {
+        $container = self::getContainer();
+        $sender = new class($onSend) implements WebhookSenderInterface {
+            /** @param \Closure(): void $onSend */
+            public function __construct(private readonly \Closure $onSend)
+            {
+            }
+
+            public function send(WebhookRequest $request): DeliveryAttempt
+            {
+                ($this->onSend)();
+
+                return new DeliveryAttempt(new \DateTimeImmutable(), 1, 204);
+            }
+        };
+        $doctrine = $container->get('doctrine');
+        $claimer = $container->get('tmonier_webhook.delivery_claimer');
+        $retryPolicy = $container->get('tmonier_webhook.retry_policy');
+        $urlPolicy = $container->get('tmonier_webhook.url_policy');
+        $redactor = $container->get('tmonier_webhook.url_redactor');
+        self::assertInstanceOf(ManagerRegistry::class, $doctrine);
+        self::assertInstanceOf(DeliveryClaimer::class, $claimer);
+        self::assertInstanceOf(RetryPolicy::class, $retryPolicy);
+        self::assertInstanceOf(EndpointUrlPolicy::class, $urlPolicy);
+        self::assertInstanceOf(UrlRedactor::class, $redactor);
+        $dispatcher = new WebhookDispatcher($doctrine, $claimer, $sender, new WebhookSigner(), $retryPolicy, $urlPolicy, $redactor, new NativeClock(), new NullLogger(), WebhookDelivery::class);
+
+        return new DispatchWebhooksCommand($dispatcher, new NullLogger(), $maxDuration);
     }
 
     /** @return array{WebhookEndpointInterface, WebhookDeliveryInterface} */

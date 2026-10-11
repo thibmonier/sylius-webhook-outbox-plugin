@@ -63,7 +63,8 @@ class OutboxEventRepository extends EntityRepository implements OutboxEventRepos
         return $this->createQueryBuilder('o')
             ->andWhere('o.occurredAt < :before')
             ->andWhere(sprintf(
-                'NOT EXISTS (SELECT d.id FROM %s d WHERE d.event = o AND d.status IN (:open))',
+                // Open deliveries of a disabled endpoint never run: they do not hold the event back.
+                'NOT EXISTS (SELECT d.id FROM %s d JOIN d.endpoint e WHERE d.event = o AND d.status IN (:open) AND e.enabled = true)',
                 WebhookDeliveryInterface::class,
             ))
             ->setParameter('before', $before->setTimezone(new \DateTimeZone('UTC')), 'datetime_immutable')

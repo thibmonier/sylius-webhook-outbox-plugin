@@ -30,7 +30,7 @@ final class CustomerWebhookDataAnonymizer
     }
 
     /**
-     * One transaction; delivery rows are locked (FOR UPDATE) and re-read before their
+     * One transaction; delivery rows are re-read with a locking read (FOR UPDATE) before their
      * responses are erased, so that a worker recording an attempt at the same time neither
      * loses its attempt nor restores the erased responses (it re-reads under the same lock).
      *
@@ -52,8 +52,9 @@ final class CustomerWebhookDataAnonymizer
                 $event->replacePayload($payload);
                 $event->markAnonymized($now);
                 foreach ($this->deliveryRepository->findByEvent($event) as $delivery) {
-                    $this->entityManager->lock($delivery, LockMode::PESSIMISTIC_WRITE);
-                    $this->entityManager->refresh($delivery);
+                    // A locking read: under REPEATABLE READ a plain refresh() would return the
+                    // snapshot of the first query and miss an attempt committed since then.
+                    $this->entityManager->refresh($delivery, LockMode::PESSIMISTIC_WRITE);
                     $delivery->eraseResponses();
                 }
                 ++$count;

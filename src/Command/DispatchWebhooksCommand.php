@@ -40,8 +40,9 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Stop after this number of deliveries (0: no limit)', '0')
             ->addOption('sleep', null, InputOption::VALUE_REQUIRED, 'Seconds to wait when nothing is due (--loop)', '1')
             ->setHelp(<<<'HELP'
-                Cron, every minute: no request starts later than --time-limit minus max_duration
-                (30 s by default), and flock skips a run while the previous one is still busy:
+                Cron, every minute: requests start during the first --time-limit minus max_duration
+                seconds (25 s with the defaults), and flock skips a run while the previous one is
+                still busy (DNS resolution is not bounded by max_duration):
                   <info>* * * * * flock -n /tmp/sylius-webhooks.lock php bin/console tmonier:webhook:dispatch --time-limit=55</info>
 
                 Long-running worker (systemd / supervisor restart it after --time-limit):
@@ -69,8 +70,8 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
         $timeLimit = self::positiveInt($input->getOption('time-limit'));
         $limit = self::positiveInt($input->getOption('limit'));
         $sleep = max(0.1, (float) self::numeric($input->getOption('sleep')));
-        if ($timeLimit > 0 && $timeLimit < $this->maxDuration + 5) {
-            $output->writeln(sprintf('<error>--time-limit must be at least max_duration + 5 s (%d s).</error>', (int) ceil($this->maxDuration + 5)));
+        if ($timeLimit > 0 && $timeLimit <= $this->maxDuration) {
+            $output->writeln(sprintf('<error>--time-limit must be greater than max_duration (%s s): no request could start.</error>', $this->maxDuration));
 
             return Command::INVALID;
         }
@@ -80,8 +81,8 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
         $counts = array_fill_keys(WebhookDeliveryInterface::STATUSES, 0);
 
         while (!$this->shouldStop) {
-            // Never start a request that could outlive the time limit (cron runs must not overlap).
-            if (null !== $deadline && microtime(true) + $this->maxDuration + 5 >= $deadline) {
+            // Only start a request that max_duration lets finish before the deadline.
+            if (null !== $deadline && microtime(true) + $this->maxDuration >= $deadline) {
                 break;
             }
             if ($limit > 0 && $sent >= $limit) {

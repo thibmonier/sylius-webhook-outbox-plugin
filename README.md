@@ -344,9 +344,11 @@ It finishes the delivery in progress on `SIGTERM` / `SIGINT`. A worker killed in
 a request leaves a lease that expires; the delivery is then sent again (receivers deduplicate
 with `webhook-id`).
 
-**Cron** (every minute). The worker never starts a request later than `--time-limit` minus
-`max_duration` minus 5 s (so `--time-limit` must be at least 35 s with the defaults), and
-`flock -n` skips a run while the previous one is still busy:
+**Cron** (every minute). A run only starts a request that `max_duration` lets finish before
+`--time-limit` (which must therefore be greater than `max_duration`): with `--time-limit=55`
+and the default 30 s, requests start during the first 25 s of each minute. DNS resolution is
+not bounded by `max_duration`, so `flock -n` skips a run while the previous one is still busy.
+For a steady flow, prefer a long-running `--loop` worker (systemd, Supervisor below):
 
 ```cron
 * * * * * cd /var/www/shop && flock -n var/webhooks.lock php bin/console tmonier:webhook:dispatch --time-limit=55 >> var/log/webhooks.log 2>&1
@@ -428,7 +430,8 @@ Retries still pending are sent with the redacted payload.
 - Endpoint URLs are often credentials too (query tokens, Slack / Make / Zapier style paths).
   Logs, recorded errors and the admin grids and pages show them rebuilt without user info,
   without query string and without the path segments that look like tokens
-  (`url_redaction_pattern`: 8+ characters mixing letters and digits, or 24+ characters).
+  (`url_redaction_pattern`: 6+ characters mixing letters and digits, 5+ digits, or 20+
+  characters; short letters-only secrets cannot be detected).
   Only the endpoint edit form shows the full URL.
 
 ## Network safety

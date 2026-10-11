@@ -179,8 +179,16 @@ An adversarial code review (19 findings) led to these decisions:
   stock; a former guest creating an account gives `customer.updated` with `has_account`;
   event ids are strictly increasing within a process (receivers sort by id, the timestamp has
   a one-second precision).
-- `Retry-After` accepts the three HTTP-date formats of RFC 9110; the cron run never starts a
-  request that could outlive `--time-limit` (and the README uses `flock`).
+- `Retry-After` accepts the three HTTP-date formats of RFC 9110; a run only starts a request
+  that `max_duration` lets finish before `--time-limit` (DNS is not bounded: the README cron
+  line uses `flock -n`).
+
+Re-verification (same day) added: the anonymizer re-reads deliveries with a locking read
+(`refresh(…, PESSIMISTIC_WRITE)`; a plain refresh returns the REPEATABLE READ snapshot); the
+claimer suspends open deliveries of disabled endpoints that a checkout fanned out from an
+older snapshot, and the purge ignores open deliveries of disabled endpoints; messages are
+redacted from the endpoint origin to the closing quote (apostrophes included); the default
+path pattern covers Zapier and Discord ids; `WebhookEndpoint::__debugInfo()` redacts the URL.
 
 ## 5. Tests
 

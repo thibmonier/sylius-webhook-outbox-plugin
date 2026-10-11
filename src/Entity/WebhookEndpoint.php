@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tmonier\SyliusWebhookOutboxPlugin\Entity;
 
 use Sylius\Resource\Model\TimestampableTrait;
+use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
 
 class WebhookEndpoint implements WebhookEndpointInterface
 {
@@ -144,7 +145,8 @@ class WebhookEndpoint implements WebhookEndpointInterface
     }
 
     /**
-     * Keeps the secret out of var_dump(), dump() and serialized exception contexts.
+     * Keeps the secret and the URL credentials out of var_dump(), dump() and serialized
+     * exception contexts.
      *
      * @return array<string, mixed>
      */
@@ -153,7 +155,7 @@ class WebhookEndpoint implements WebhookEndpointInterface
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'url' => $this->url,
+            'url' => null === $this->url ? null : (new UrlRedactor())->redact($this->url),
             'enabled' => $this->enabled,
             'secret' => null === $this->secret ? null : '[redacted]',
         ];

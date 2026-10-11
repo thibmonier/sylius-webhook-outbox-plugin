@@ -20,12 +20,24 @@ final class UrlRedactorTest extends TestCase
         );
         self::assertSame('https://hook.eu1.make.com/[redacted]', $redactor->redact('https://hook.eu1.make.com/zq7xfd4mw2c9bnl1rk5t8yhv3e6a0gpj'));
         self::assertSame('https://erp.example.com/webhooks/sylius/v2', $redactor->redact('https://erp.example.com/webhooks/sylius/v2'));
+        self::assertSame('https://hooks.zapier.com/hooks/catch/[redacted]/[redacted]/', $redactor->redact('https://hooks.zapier.com/hooks/catch/123456/abc1de2/'));
+        self::assertSame('https://discord.com/api/webhooks/[redacted]/[redacted]', $redactor->redact('https://discord.com/api/webhooks/112233445566778899/AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789'));
         self::assertSame('[invalid url]', $redactor->redact('nope'));
     }
 
     public function testPathRedactionCanBeDisabled(): void
     {
         self::assertSame('https://hook.example.com/zq7xfd4mw2c9bnl1?[redacted]', (new UrlRedactor(null))->redact('https://hook.example.com/zq7xfd4mw2c9bnl1?a=b'));
+    }
+
+    public function testApostrophesInTheQueryDoNotLeakTheRestOfTheToken(): void
+    {
+        $redactor = new UrlRedactor();
+        $url = "https://hook.example.com/x?sig=ab'cdTOKEN";
+
+        $message = $redactor->redactMessage('Idle timeout reached for "https://hook.example.com/x?sig=ab\'cdTOKEN".', $url);
+        self::assertSame('Idle timeout reached for "https://hook.example.com/x?[redacted]".', $message);
+        self::assertStringNotContainsString('TOKEN', $redactor->redactMessage("Failed: https://other.example.net/y?k=a'bTOKEN end", $url));
     }
 
     public function testMessagesAreRedactedWhateverTheEncoding(): void

@@ -83,7 +83,11 @@ final class WebhookDeliveryTest extends TestCase
         self::assertTrue($endpoint->acceptsChannel('WEB'));
         self::assertTrue($endpoint->acceptsChannel(null));
         self::assertFalse($endpoint->acceptsChannel('B2B'));
-        self::assertStringNotContainsString('MfKQ9r8', print_r($endpoint, true));
+        $endpoint->setUrl('https://hooks.zapier.com/hooks/catch/123456/abc1de2/?token=s3cr3t');
+        $dump = print_r($endpoint, true);
+        self::assertStringNotContainsString('MfKQ9r8', $dump);
+        self::assertStringNotContainsString('abc1de2', $dump);
+        self::assertStringNotContainsString('s3cr3t', $dump);
 
         $endpoint->disable('410 Gone', new \DateTimeImmutable());
         self::assertFalse($endpoint->isEnabled());

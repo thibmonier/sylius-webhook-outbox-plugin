@@ -61,6 +61,8 @@ final class DeliveryClaimer
         $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
         $table = $this->deliveryTable();
 
+        $this->suspendDeliveriesOfDisabledEndpoints($connection);
+
         // Separate query: locking a join would lock the endpoint rows too.
         $endpointIds = array_map(
             static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0,
@@ -128,6 +130,40 @@ final class DeliveryClaimer
         ;
 
         return $claim->token === $query->executeQuery()->fetchOne();
+    }
+
+    /**
+     * Self-healing: a flush that read the endpoint as enabled before it was disabled (its
+     * snapshot predates the change) may still fan out a pending delivery to it. Such
+     * deliveries are suspended here, like EndpointAvailabilityListener does on disable.
+     */
+    public function suspendDeliveriesOfDisabledEndpoints(?Connection $connection = null): int
+    {
+        $connection ??= $this->entityManager()->getConnection();
+        $table = $this->deliveryTable();
+
+        // Plain reads first: the UPDATE only runs, through the endpoint_id index, when needed.
+        $disabled = array_map(
+            static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0,
+            $connection->fetchFirstColumn(
+                sprintf('SELECT id FROM %s WHERE enabled = ?', $this->entityManager()->getClassMetadata($this->endpointClass)->getTableName()),
+                [false],
+                [ParameterType::BOOLEAN],
+            ),
+        );
+        if ([] === $disabled || false === $connection->fetchOne(
+            sprintf('SELECT id FROM %s WHERE endpoint_id IN (?) AND status IN (?)', $table),
+            [$disabled, self::OPEN_STATUSES],
+            [ArrayParameterType::INTEGER, ArrayParameterType::STRING],
+        )) {
+            return 0;
+        }
+
+        return (int) $connection->executeStatement(
+            sprintf('UPDATE %s SET status = ?, next_attempt_at = NULL, claimed_until = NULL, claim_token = NULL WHERE endpoint_id IN (?) AND status IN (?)', $table),
+            [WebhookDeliveryInterface::STATUS_SUSPENDED, $disabled, self::OPEN_STATUSES],
+            [ParameterType::STRING, ArrayParameterType::INTEGER, ArrayParameterType::STRING],
+        );
     }
 
     /** Gives a claimed delivery back (the attempt could not be recorded). */

@@ -17,12 +17,14 @@ final class UrlRedactor
     public const REDACTED = '[redacted]';
 
     /**
-     * Path segments hidden by default: 8+ characters mixing letters and digits, or 24+ token
-     * characters.
+     * Path segments hidden by default: 6+ characters mixing letters and digits (Slack, Zapier
+     * hook ids), 5+ digits (account ids), or 20+ token characters (Make, Discord). Short
+     * letters-only secrets cannot be told from words: keep secrets out of URLs when possible.
      */
-    public const DEFAULT_SECRET_SEGMENT_PATTERN = '/^(?=[^\/]*\d)(?=[^\/]*[A-Za-z])[A-Za-z0-9_\-.~]{8,}$|^[A-Za-z0-9_\-.~]{24,}$/';
+    public const DEFAULT_SECRET_SEGMENT_PATTERN = '/^(?=[^\/]*\d)(?=[^\/]*[A-Za-z])[A-Za-z0-9_\-.~]{6,}$|^\d{5,}$|^[A-Za-z0-9_\-.~]{20,}$/';
 
-    private const URL_IN_TEXT = '~[a-z][a-z0-9+.\-]*://[^\s"\'<>`]+~i';
+    /** Quotes and spaces end a URL; apostrophes do not (they are valid in a query). */
+    private const URL_IN_TEXT = '~[a-z][a-z0-9+.\-]*://[^\s"<>`]+~i';
 
     /** @param string|null $secretSegmentPattern null keeps every path segment */
     public function __construct(private readonly ?string $secretSegmentPattern = self::DEFAULT_SECRET_SEGMENT_PATTERN)
@@ -58,6 +60,14 @@ final class UrlRedactor
     /** Redacts every URL quoted in a message (the endpoint URL in any encoding included). */
     public function redactMessage(string $message, string $url = ''): string
     {
+        // The endpoint URL first, in any encoding: whatever follows its scheme and host up to a
+        // quote, a space or the end belongs to it.
+        $parts = '' === $url ? false : parse_url($url);
+        if (false !== $parts && isset($parts['host'])) {
+            $origin = '~[a-z][a-z0-9+.\-]*://(?:[^\s"<>`/@]*@)?' . preg_quote($parts['host'], '~') . '(?::\d+)?(?:[/?#][^\s"<>`]*)?~i';
+            $message = preg_replace($origin, $this->redact($url), $message) ?? '';
+        }
+
         $redacted = preg_replace_callback(
             self::URL_IN_TEXT,
             fn (array $match): string => $this->redact(rtrim($match[0], '.,;:)')) . substr($match[0], strlen(rtrim($match[0], '.,;:)'))),
@@ -65,7 +75,6 @@ final class UrlRedactor
         ) ?? '';
 
         // Credentials of the endpoint quoted without their URL (rare, but cheap to remove).
-        $parts = '' === $url ? false : parse_url($url);
         if (false !== $parts) {
             foreach ([$parts['user'] ?? null, $parts['pass'] ?? null, $parts['query'] ?? null] as $secret) {
                 if (null !== $secret && strlen($secret) >= 4) {

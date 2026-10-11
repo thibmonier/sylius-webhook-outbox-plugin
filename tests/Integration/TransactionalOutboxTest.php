@@ -11,6 +11,7 @@ use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Events;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\NullLogger;
 use Sylius\Component\Core\OrderPaymentStates;
@@ -27,6 +28,10 @@ use Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEventInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
+use Tmonier\SyliusWebhookOutboxPlugin\Maintenance\CustomerWebhookDataAnonymizer;
+use Tmonier\SyliusWebhookOutboxPlugin\Maintenance\PayloadRedactor;
+use Tmonier\SyliusWebhookOutboxPlugin\Repository\OutboxEventRepositoryInterface;
+use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookDeliveryRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Signature\WebhookSigner;
 
 /**
@@ -262,6 +267,80 @@ final class TransactionalOutboxTest extends KernelTestCase
         $history = json_decode(self::string($row['attempt_history']), true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($history);
         self::assertSame([null, null], array_column($history, 'response_body'), 'The erased excerpt is not restored.');
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function priorAttempt(): iterable
+    {
+        yield 'first attempt' => [false];
+        yield 'after a failed attempt' => [true];
+    }
+
+    /**
+     * The real anonymizer, while a worker commits an attempt on another connection after the
+     * anonymizer's first read and before it reaches the delivery.
+     *
+     * @dataProvider priorAttempt
+     */
+    public function testTheAnonymizerSeesAnAttemptCommittedDuringItsTransaction(bool $prior): void
+    {
+        $deliveryId = $this->committedDelivery();
+        $customerId = self::int($this->observer->fetchOne('SELECT e.customer_id FROM tmonier_webhook_outbox_event e JOIN tmonier_webhook_delivery d ON d.event_id = e.id WHERE d.id = ?', [$deliveryId]));
+        if ($prior) {
+            $this->observer->update('tmonier_webhook_delivery', [
+                'attempts' => 1,
+                'status' => 'failed',
+                'last_response_body' => 'echo prior: ada@example.com',
+                'attempt_history' => json_encode([['at' => '2026-10-11T00:00:00Z', 'duration_ms' => 3, 'status_code' => 500, 'error' => null, 'response_body' => 'echo prior: ada@example.com']]),
+            ], ['id' => $deliveryId]);
+        }
+
+        $observer = $this->observer;
+        $fired = false;
+        $workerCommit = static function () use ($observer, $deliveryId, &$fired): void {
+            if ($fired) {
+                return;
+            }
+            $fired = true;
+            $history = json_decode(self::string($observer->fetchOne('SELECT attempt_history FROM tmonier_webhook_delivery WHERE id = ?', [$deliveryId])), true, flags: \JSON_THROW_ON_ERROR);
+            self::assertIsArray($history);
+            array_unshift($history, ['at' => '2026-10-11T00:01:00Z', 'duration_ms' => 3, 'status_code' => 500, 'error' => null, 'response_body' => 'echo worker: ada@example.com']);
+            $observer->executeStatement(
+                'UPDATE tmonier_webhook_delivery SET attempts = attempts + 1, status = ?, last_response_body = ?, attempt_history = ? WHERE id = ?',
+                ['failed', 'echo worker: ada@example.com', json_encode($history), $deliveryId],
+            );
+        };
+
+        $entityManager = $this->entityManager();
+        $entityManager->clear();
+        $deliveries = new class($entityManager, $entityManager->getClassMetadata(WebhookDelivery::class), $workerCommit) extends WebhookDeliveryRepository {
+            /** @param ClassMetadata<WebhookDelivery> $class */
+            public function __construct(EntityManagerInterface $entityManager, ClassMetadata $class, private readonly \Closure $afterRead)
+            {
+                parent::__construct($entityManager, $class);
+            }
+
+            public function findByEvent(OutboxEventInterface $event): array
+            {
+                $deliveries = parent::findByEvent($event);
+                ($this->afterRead)();
+
+                return $deliveries;
+            }
+        };
+        $events = self::getContainer()->get('tmonier_webhook.repository.outbox_event');
+        self::assertInstanceOf(OutboxEventRepositoryInterface::class, $events);
+
+        $anonymizer = new CustomerWebhookDataAnonymizer($events, $deliveries, $entityManager, new PayloadRedactor(), new NativeClock());
+        self::assertSame(1, $anonymizer->anonymize($customerId));
+        self::assertTrue($fired);
+
+        $row = $this->deliveryRow($deliveryId);
+        self::assertNull($row['last_response_body'], 'The worker\'s response excerpt is erased.');
+        self::assertSame($prior ? 2 : 1, self::int($row['attempts']));
+        $history = json_decode(self::string($row['attempt_history']), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($history);
+        self::assertSame($prior ? [null, null] : [null], array_column($history, 'response_body'), 'No excerpt left and no attempt lost.');
     }
 
     public function testAClaimDoesNotBlockTheCheckoutNorTheOtherWorkers(): void
