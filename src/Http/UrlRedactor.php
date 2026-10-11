@@ -24,11 +24,35 @@ final class UrlRedactor
     public const DEFAULT_SECRET_SEGMENT_PATTERN = '/^(?=[^\/]*\d)(?=[^\/]*[A-Za-z])[A-Za-z0-9_\-.~]{6,}$|^\d{5,}$|^[A-Za-z0-9_\-.~]{20,}$/';
 
     /** Quotes and spaces end a URL; apostrophes do not (they are valid in a query). */
+    /**
+     * Hook providers whose path is the credential: every segment after the prefix is hidden,
+     * whatever it looks like (Zapier hook ids can be letters only).
+     */
+    public const KNOWN_HOOK_PATHS = [
+        '~^hooks\.zapier\.com$~i' => '/hooks/catch/',
+        '~^hooks\.slack\.com$~i' => '/services/',
+        '~^(?:[a-z0-9-]+\.)?discord(?:app)?\.com$~i' => '/api/webhooks/',
+        '~^hook\.(?:[a-z0-9-]+\.)?(?:make|integromat)\.com$~i' => '/',
+    ];
+
+    private static ?self $default = null;
+
     private const URL_IN_TEXT = '~[a-z][a-z0-9+.\-]*://[^\s"<>`]+~i';
 
     /** @param string|null $secretSegmentPattern null keeps every path segment */
     public function __construct(private readonly ?string $secretSegmentPattern = self::DEFAULT_SECRET_SEGMENT_PATTERN)
     {
+    }
+
+    /** The redactor configured by the bundle (entities use it in __debugInfo()). */
+    public static function default(): self
+    {
+        return self::$default ??= new self();
+    }
+
+    public static function setDefault(self $redactor): void
+    {
+        self::$default = $redactor;
     }
 
     public function redact(string $url): string
@@ -40,11 +64,17 @@ final class UrlRedactor
 
         $path = '';
         if (isset($parts['path']) && '' !== $parts['path']) {
-            $segments = array_map(
-                fn (string $segment): string => null !== $this->secretSegmentPattern && 1 === preg_match($this->secretSegmentPattern, $segment) ? self::REDACTED : $segment,
-                explode('/', $parts['path']),
-            );
-            $path = implode('/', $segments);
+            $prefix = self::knownHookPrefix($parts['host'], $parts['path']);
+            if (null !== $prefix) {
+                $rest = substr($parts['path'], strlen($prefix));
+                $path = $prefix . implode('/', array_map(static fn (string $segment): string => '' === $segment ? '' : self::REDACTED, explode('/', $rest)));
+            } else {
+                $segments = array_map(
+                    fn (string $segment): string => null !== $this->secretSegmentPattern && 1 === preg_match($this->secretSegmentPattern, $segment) ? self::REDACTED : $segment,
+                    explode('/', $parts['path']),
+                );
+                $path = implode('/', $segments);
+            }
         }
 
         return sprintf(
@@ -55,6 +85,17 @@ final class UrlRedactor
             $path,
             isset($parts['query']) ? '?' . self::REDACTED : '',
         );
+    }
+
+    private static function knownHookPrefix(string $host, string $path): ?string
+    {
+        foreach (self::KNOWN_HOOK_PATHS as $hostPattern => $prefix) {
+            if (1 === preg_match($hostPattern, $host) && 0 === stripos($path, $prefix)) {
+                return substr($path, 0, strlen($prefix));
+            }
+        }
+
+        return null;
     }
 
     /** Redacts every URL quoted in a message (the endpoint URL in any encoding included). */

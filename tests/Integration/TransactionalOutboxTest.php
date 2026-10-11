@@ -26,6 +26,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookSenderInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\DeliveryAttempt;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEventInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDelivery;
+use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpoint;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\EndpointUrlPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
 use Tmonier\SyliusWebhookOutboxPlugin\Maintenance\CustomerWebhookDataAnonymizer;
@@ -341,6 +342,60 @@ final class TransactionalOutboxTest extends KernelTestCase
         $history = json_decode(self::string($row['attempt_history']), true, flags: \JSON_THROW_ON_ERROR);
         self::assertIsArray($history);
         self::assertSame($prior ? [null, null] : [null], array_column($history, 'response_body'), 'No excerpt left and no attempt lost.');
+    }
+
+    public function testAReEnableRacingWithTheWorkerNeverStrandsDeliveries(): void
+    {
+        $deliveryId = $this->committedDelivery();
+        $endpoint = $this->entityManager()->find(WebhookEndpoint::class, $this->endpointIds[0]);
+        self::assertInstanceOf(WebhookEndpoint::class, $endpoint);
+        $endpoint->setEnabled(false);
+        $this->entityManager()->flush();
+        self::assertSame('suspended', $this->deliveryRow($deliveryId)['status']);
+
+        // A pending delivery fanned out from an older snapshot, then the admin re-enables the
+        // endpoint between the worker's state read and its UPDATE.
+        $this->observer->update('tmonier_webhook_delivery', ['status' => 'pending'], ['id' => $deliveryId]);
+        $entityManager = $this->entityManager();
+        HookedConnection::$afterEndpointRead = static function () use ($endpoint, $entityManager): void {
+            $endpoint->setEnabled(true);
+            $entityManager->flush();
+        };
+        $worker = DriverManager::getConnection(['wrapperClass' => HookedConnection::class] + $this->connection()->getParams());
+        $claimer = self::getContainer()->get('tmonier_webhook.delivery_claimer');
+        self::assertInstanceOf(DeliveryClaimer::class, $claimer);
+
+        try {
+            $claimer->claimOn($worker);
+        } finally {
+            HookedConnection::$afterEndpointRead = null;
+            $worker->close();
+        }
+
+        self::assertSame(1, self::int($this->observer->fetchOne('SELECT enabled FROM tmonier_webhook_endpoint WHERE id = ?', [$this->endpointIds[0]])));
+        self::assertNotSame('suspended', $this->deliveryRow($deliveryId)['status'], 'Not suspended on an enabled endpoint.');
+
+        // And a delivery left suspended on an enabled endpoint is requeued by the next run.
+        $this->observer->update('tmonier_webhook_delivery', ['status' => 'suspended', 'next_attempt_at' => null, 'claimed_until' => null, 'claim_token' => null], ['id' => $deliveryId]);
+        self::assertSame(1, $claimer->reconcileEndpointStates());
+        self::assertSame('pending', $this->deliveryRow($deliveryId)['status']);
+    }
+
+    public function testReconciliationNeverTouchesALiveClaim(): void
+    {
+        $deliveryId = $this->committedDelivery();
+        $this->observer->update('tmonier_webhook_delivery', ['claimed_until' => '2099-01-01 00:00:00', 'claim_token' => 'busy-worker'], ['id' => $deliveryId]);
+        $this->observer->update('tmonier_webhook_endpoint', ['enabled' => 0], ['id' => $this->endpointIds[0]]);
+        $claimer = self::getContainer()->get('tmonier_webhook.delivery_claimer');
+        self::assertInstanceOf(DeliveryClaimer::class, $claimer);
+
+        $claimer->reconcileEndpointStates();
+        self::assertSame('pending', $this->deliveryRow($deliveryId)['status'], 'The worker sending it decides.');
+        self::assertSame('busy-worker', $this->deliveryRow($deliveryId)['claim_token']);
+
+        $this->observer->update('tmonier_webhook_delivery', ['claimed_until' => '2020-01-01 00:00:00'], ['id' => $deliveryId]);
+        $claimer->reconcileEndpointStates();
+        self::assertSame('suspended', $this->deliveryRow($deliveryId)['status'], 'Suspended once the lease expired.');
     }
 
     public function testAClaimDoesNotBlockTheCheckoutNorTheOtherWorkers(): void

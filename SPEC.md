@@ -189,6 +189,10 @@ claimer suspends open deliveries of disabled endpoints that a checkout fanned ou
 older snapshot, and the purge ignores open deliveries of disabled endpoints; messages are
 redacted from the endpoint origin to the closing quote (apostrophes included); the default
 path pattern covers Zapier and Discord ids; `WebhookEndpoint::__debugInfo()` redacts the URL.
+Round 2: the endpoint-state reconciliation checks the state inside each UPDATE (subquery),
+skips live claims and also requeues suspended deliveries of enabled endpoints, so the state
+converges whatever the races; known hook providers (Zapier, Slack, Discord, Make) have their
+whole credential path hidden; a VarDumper caster redacts the secret and the URL in dumps.
 
 ## 5. Tests
 

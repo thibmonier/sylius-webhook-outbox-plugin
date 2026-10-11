@@ -155,7 +155,7 @@ class WebhookEndpoint implements WebhookEndpointInterface
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'url' => null === $this->url ? null : (new UrlRedactor())->redact($this->url),
+            'url' => null === $this->url ? null : UrlRedactor::default()->redact($this->url),
             'enabled' => $this->enabled,
             'secret' => null === $this->secret ? null : '[redacted]',
         ];

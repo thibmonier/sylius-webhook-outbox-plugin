@@ -153,6 +153,7 @@ return static function (ContainerConfigurator $container): void {
     $services
         ->set('tmonier_webhook.url_redactor', UrlRedactor::class)
         ->args([param('tmonier_webhook.url_redaction_pattern')])
+        ->public()
     ;
     $services
         ->set('tmonier_webhook.url_policy', EndpointUrlPolicy::class)

@@ -25,6 +25,17 @@ final class UrlRedactorTest extends TestCase
         self::assertSame('[invalid url]', $redactor->redact('nope'));
     }
 
+    public function testKnownHookProvidersHideTheWholeCredentialPath(): void
+    {
+        $redactor = new UrlRedactor(null);
+
+        self::assertSame('https://hooks.zapier.com/hooks/catch/[redacted]/[redacted]/', $redactor->redact('https://hooks.zapier.com/hooks/catch/abcdef/ghijkl/'));
+        self::assertSame('https://hooks.slack.com/services/[redacted]/[redacted]/[redacted]', $redactor->redact('https://hooks.slack.com/services/TABC/BDEF/xyz'));
+        self::assertSame('https://discord.com/api/webhooks/[redacted]/[redacted]', $redactor->redact('https://discord.com/api/webhooks/123/token'));
+        self::assertSame('https://hook.eu1.make.com/[redacted]', $redactor->redact('https://hook.eu1.make.com/abcdefgh'));
+        self::assertSame('https://hooks.zapier.com/other/path', $redactor->redact('https://hooks.zapier.com/other/path'), 'Only the hook paths.');
+    }
+
     public function testPathRedactionCanBeDisabled(): void
     {
         self::assertSame('https://hook.example.com/zq7xfd4mw2c9bnl1?[redacted]', (new UrlRedactor(null))->redact('https://hook.example.com/zq7xfd4mw2c9bnl1?a=b'));

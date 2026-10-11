@@ -61,7 +61,7 @@ final class DeliveryClaimer
         $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
         $table = $this->deliveryTable();
 
-        $this->suspendDeliveriesOfDisabledEndpoints($connection);
+        $this->reconcileEndpointStates($connection);
 
         // Separate query: locking a join would lock the endpoint rows too.
         $endpointIds = array_map(
@@ -133,37 +133,58 @@ final class DeliveryClaimer
     }
 
     /**
-     * Self-healing: a flush that read the endpoint as enabled before it was disabled (its
-     * snapshot predates the change) may still fan out a pending delivery to it. Such
-     * deliveries are suspended here, like EndpointAvailabilityListener does on disable.
+     * Self-healing, both ways, so that the state always converges whatever the races:
+     *  - open deliveries of a disabled endpoint are suspended (a flush that read the endpoint
+     *    as enabled before it was disabled may still fan out to it);
+     *  - suspended deliveries of an enabled endpoint are requeued (a suspension racing with a
+     *    re-enable).
+     * The endpoint state is checked inside each UPDATE (subquery), never from an earlier read,
+     * and a delivery with a live claim is never touched.
+     *
+     * @return int number of deliveries changed
      */
-    public function suspendDeliveriesOfDisabledEndpoints(?Connection $connection = null): int
+    public function reconcileEndpointStates(?Connection $connection = null): int
     {
         $connection ??= $this->entityManager()->getConnection();
         $table = $this->deliveryTable();
+        $endpointTable = $this->entityManager()->getClassMetadata($this->endpointClass)->getTableName();
+        $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
 
-        // Plain reads first: the UPDATE only runs, through the endpoint_id index, when needed.
-        $disabled = array_map(
-            static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0,
-            $connection->fetchFirstColumn(
-                sprintf('SELECT id FROM %s WHERE enabled = ?', $this->entityManager()->getClassMetadata($this->endpointClass)->getTableName()),
-                [false],
-                [ParameterType::BOOLEAN],
+        // Plain read first: the UPDATEs only run when something may need them.
+        $mismatch = $connection->fetchOne(
+            sprintf(
+                'SELECT d.id FROM %1$s d INNER JOIN %2$s e ON e.id = d.endpoint_id WHERE (e.enabled = ? AND d.status IN (?)) OR (e.enabled = ? AND d.status = ?)',
+                $table,
+                $endpointTable,
             ),
+            [false, self::OPEN_STATUSES, true, WebhookDeliveryInterface::STATUS_SUSPENDED],
+            [ParameterType::BOOLEAN, ArrayParameterType::STRING, ParameterType::BOOLEAN, ParameterType::STRING],
         );
-        if ([] === $disabled || false === $connection->fetchOne(
-            sprintf('SELECT id FROM %s WHERE endpoint_id IN (?) AND status IN (?)', $table),
-            [$disabled, self::OPEN_STATUSES],
-            [ArrayParameterType::INTEGER, ArrayParameterType::STRING],
-        )) {
+        if (false === $mismatch) {
             return 0;
         }
 
-        return (int) $connection->executeStatement(
-            sprintf('UPDATE %s SET status = ?, next_attempt_at = NULL, claimed_until = NULL, claim_token = NULL WHERE endpoint_id IN (?) AND status IN (?)', $table),
-            [WebhookDeliveryInterface::STATUS_SUSPENDED, $disabled, self::OPEN_STATUSES],
-            [ParameterType::STRING, ArrayParameterType::INTEGER, ArrayParameterType::STRING],
+        $changed = $connection->executeStatement(
+            sprintf(
+                'UPDATE %1$s SET status = ?, next_attempt_at = NULL, claimed_until = NULL, claim_token = NULL WHERE status IN (?) AND (claimed_until IS NULL OR claimed_until < ?) AND endpoint_id IN (SELECT id FROM %2$s WHERE enabled = ?)',
+                $table,
+                $endpointTable,
+            ),
+            [WebhookDeliveryInterface::STATUS_SUSPENDED, self::OPEN_STATUSES, $now, false],
+            [ParameterType::STRING, ArrayParameterType::STRING, Types::DATETIME_IMMUTABLE, ParameterType::BOOLEAN],
         );
+
+        $changed += $connection->executeStatement(
+            sprintf(
+                'UPDATE %1$s SET status = ?, next_attempt_at = ? WHERE status = ? AND endpoint_id IN (SELECT id FROM %2$s WHERE enabled = ?)',
+                $table,
+                $endpointTable,
+            ),
+            [WebhookDeliveryInterface::STATUS_PENDING, $now, WebhookDeliveryInterface::STATUS_SUSPENDED, true],
+            [ParameterType::STRING, Types::DATETIME_IMMUTABLE, ParameterType::STRING, ParameterType::BOOLEAN],
+        );
+
+        return (int) $changed;
     }
 
     /** Gives a claimed delivery back (the attempt could not be recorded). */

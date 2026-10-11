@@ -431,7 +431,9 @@ Retries still pending are sent with the redacted payload.
   Logs, recorded errors and the admin grids and pages show them rebuilt without user info,
   without query string and without the path segments that look like tokens
   (`url_redaction_pattern`: 6+ characters mixing letters and digits, 5+ digits, or 20+
-  characters; short letters-only secrets cannot be detected).
+  characters; short letters-only secrets cannot be detected). For Zapier, Slack, Discord and
+  Make hook URLs, the whole path after the hook prefix is hidden. `dump()`, the profiler and
+  the debug toolbar show the endpoint with its secret and URL redacted (VarDumper caster).
   Only the endpoint edit form shows the full URL.
 
 ## Network safety
