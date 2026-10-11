@@ -7,7 +7,6 @@ namespace Tests\Tmonier\SyliusWebhookOutboxPlugin\Integration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\DBAL\Query\ForUpdate\ConflictResolutionMode;
 use Doctrine\Persistence\ManagerRegistry;
 use Sylius\Component\Core\OrderPaymentStates;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -172,15 +171,13 @@ final class TransactionalOutboxTest extends KernelTestCase
 
         // Worker B locks one due delivery in an open transaction...
         $this->observer->beginTransaction();
+        // Lock by primary key: a sorted scan would lock every row it reads.
         $lockedId = $this->observer->createQueryBuilder()
             ->select('id')
             ->from('tmonier_webhook_delivery')
-            ->where('endpoint_id = :endpoint')
-            ->orderBy('next_attempt_at')
-            ->addOrderBy('id')
-            ->setMaxResults(1)
-            ->setParameter('endpoint', $this->endpointIds[0])
-            ->forUpdate(ConflictResolutionMode::SKIP_LOCKED)
+            ->where('id = :id')
+            ->setParameter('id', min($this->deliveryIdsOfTestEndpoint()))
+            ->forUpdate()
             ->executeQuery()
             ->fetchOne()
         ;

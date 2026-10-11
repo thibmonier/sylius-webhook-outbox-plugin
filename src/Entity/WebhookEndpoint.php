@@ -139,7 +139,7 @@ class WebhookEndpoint implements WebhookEndpointInterface
     public function disable(string $reason, \DateTimeImmutable $at): void
     {
         $this->enabled = false;
-        $this->disabledAt = $at;
+        $this->disabledAt = \DateTime::createFromImmutable($at);
         $this->disabledReason = mb_substr($reason, 0, 255);
     }
 
