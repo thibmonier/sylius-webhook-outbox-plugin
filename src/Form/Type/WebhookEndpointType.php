@@ -63,7 +63,7 @@ final class WebhookEndpointType extends AbstractResourceType
                 'required' => false,
             ])
             ->add('enabled', CheckboxType::class, [
-                'label' => 'sylius.ui.enabled',
+                'label' => 'tmonier_webhook.ui.enabled',
                 'required' => false,
             ])
             ->add('eventTypes', ChoiceType::class, [

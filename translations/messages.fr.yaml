@@ -46,6 +46,10 @@ tmonier_webhook:
         attempt_history: "Tentatives"
         duration: "Durée"
         error: "Erreur"
+        enabled: "Activé"
+        disabled: "Désactivé"
+        state: "Statut"
+        date: "Date"
         history_limit: "Les %count% dernières tentatives sont conservées."
         status:
             pending: "En attente"

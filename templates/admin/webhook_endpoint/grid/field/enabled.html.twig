@@ -1,6 +1,6 @@
 {% if data.enabled %}
-    <span class="badge bg-green-lt">{{ 'sylius.ui.enabled'|trans }}</span>
+    <span class="badge bg-green-lt">{{ 'tmonier_webhook.ui.enabled'|trans }}</span>
 {% else %}
-    <span class="badge bg-red-lt" {{ sylius_test_html_attribute('tmonier-webhook-disabled') }}>{{ 'sylius.ui.disabled'|trans }}</span>
+    <span class="badge bg-red-lt" {{ sylius_test_html_attribute('tmonier-webhook-disabled') }}>{{ 'tmonier_webhook.ui.disabled'|trans }}</span>
     {% if data.disabledReason is not null %}<div class="small text-secondary">{{ data.disabledReason }}</div>{% endif %}
 {% endif %}

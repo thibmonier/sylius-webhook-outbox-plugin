@@ -46,6 +46,10 @@ tmonier_webhook:
         attempt_history: "Pogingen"
         duration: "Duur"
         error: "Fout"
+        enabled: "Ingeschakeld"
+        disabled: "Uitgeschakeld"
+        state: "Status"
+        date: "Datum"
         history_limit: "De laatste %count% pogingen worden bewaard."
         status:
             pending: "In afwachting"

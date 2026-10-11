@@ -30,7 +30,7 @@ sylius_grid:
                         template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_endpoint/grid/field/event_types.html.twig"
                 enabled:
                     type: twig
-                    label: sylius.ui.enabled
+                    label: tmonier_webhook.ui.enabled
                     path: .
                     sortable: enabled
                     options:
@@ -43,7 +43,7 @@ sylius_grid:
                         fields: [name, url]
                 enabled:
                     type: boolean
-                    label: sylius.ui.enabled
+                    label: tmonier_webhook.ui.enabled
             actions:
                 main:
                     create:
@@ -92,7 +92,7 @@ sylius_grid:
             fields:
                 createdAt:
                     type: twig
-                    label: sylius.ui.date
+                    label: tmonier_webhook.ui.date
                     sortable: ~
                     options:
                         template: "@SyliusAdmin/shared/grid/field/date.html.twig"
@@ -112,7 +112,7 @@ sylius_grid:
                         template: "@TmonierSyliusWebhookOutboxPlugin/admin/webhook_delivery/grid/field/endpoint.html.twig"
                 status:
                     type: twig
-                    label: sylius.ui.state
+                    label: tmonier_webhook.ui.state
                     path: .
                     sortable: status
                     options:
@@ -132,7 +132,7 @@ sylius_grid:
             filters:
                 status:
                     type: select
-                    label: sylius.ui.state
+                    label: tmonier_webhook.ui.state
                     form_options:
                         choices:
                             tmonier_webhook.ui.status.pending: pending
@@ -159,7 +159,7 @@ sylius_grid:
                         type: equal
                 createdAt:
                     type: date
-                    label: sylius.ui.date
+                    label: tmonier_webhook.ui.date
             actions:
                 item:
                     show:
