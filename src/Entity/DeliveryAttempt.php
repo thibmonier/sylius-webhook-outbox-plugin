@@ -8,17 +8,17 @@ namespace Tmonier\SyliusWebhookOutboxPlugin\Entity;
  * Outcome of one HTTP attempt. The response body is already truncated and the error message
  * free of endpoint credentials (see HttpWebhookSender).
  */
-final class DeliveryAttempt
+final readonly class DeliveryAttempt
 {
     public function __construct(
-        public readonly \DateTimeImmutable $at,
-        public readonly int $durationMs,
-        public readonly ?int $statusCode,
-        public readonly ?string $responseBody = null,
-        public readonly ?string $error = null,
-        public readonly ?int $retryAfterSeconds = null,
+        public \DateTimeImmutable $at,
+        public int $durationMs,
+        public ?int $statusCode,
+        public ?string $responseBody = null,
+        public ?string $error = null,
+        public ?int $retryAfterSeconds = null,
         /** No retry: the request could not even be built (invalid URL, missing secret). */
-        public readonly bool $permanentFailure = false,
+        public bool $permanentFailure = false,
     ) {
     }
 

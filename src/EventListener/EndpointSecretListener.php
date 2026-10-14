@@ -14,11 +14,11 @@ use Tmonier\SyliusWebhookOutboxPlugin\Signature\SecretGenerator;
  * is the "copy your secret" page instead of the usual redirection, so that the secret never
  * goes through the session (flash) nor a URL.
  */
-final class EndpointSecretListener
+final readonly class EndpointSecretListener
 {
     public function __construct(
-        private readonly SecretGenerator $secretGenerator,
-        private readonly SecretRevealer $revealer,
+        private SecretGenerator $secretGenerator,
+        private SecretRevealer $revealer,
     ) {
     }
 

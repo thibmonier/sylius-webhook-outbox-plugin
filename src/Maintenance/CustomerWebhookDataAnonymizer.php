@@ -18,14 +18,14 @@ use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookDeliveryRepositoryInterf
  * webhook-id would either be ignored by the receiver (deduplication) or overwrite its data
  * with blanks. Pending retries are sent with the redacted body.
  */
-final class CustomerWebhookDataAnonymizer
+final readonly class CustomerWebhookDataAnonymizer
 {
     public function __construct(
-        private readonly OutboxEventRepositoryInterface $eventRepository,
-        private readonly WebhookDeliveryRepositoryInterface $deliveryRepository,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly PayloadRedactor $redactor,
-        private readonly ClockInterface $clock,
+        private OutboxEventRepositoryInterface $eventRepository,
+        private WebhookDeliveryRepositoryInterface $deliveryRepository,
+        private EntityManagerInterface $entityManager,
+        private PayloadRedactor $redactor,
+        private ClockInterface $clock,
     ) {
     }
 

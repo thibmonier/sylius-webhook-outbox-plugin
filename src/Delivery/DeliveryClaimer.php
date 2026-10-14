@@ -157,7 +157,7 @@ final class DeliveryClaimer
         $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
         $changed = 0;
 
-        $disabled = self::ids($connection->fetchFirstColumn(sprintf('SELECT id FROM %s WHERE enabled = ?', $endpointTable), [false], [ParameterType::BOOLEAN]));
+        $disabled = $this->ids($connection->fetchFirstColumn(sprintf('SELECT id FROM %s WHERE enabled = ?', $endpointTable), [false], [ParameterType::BOOLEAN]));
         // Each UPDATE only runs after a plain indexed read found candidates: an UPDATE matching
         // nothing would still hold gap locks that block the checkout inserts.
         if ([] !== $disabled && $this->exists($connection, $table, $disabled, self::OPEN_STATUSES)) {
@@ -172,7 +172,7 @@ final class DeliveryClaimer
             );
         }
 
-        $enabled = self::ids($connection->fetchFirstColumn(sprintf('SELECT id FROM %s WHERE enabled = ?', $endpointTable), [true], [ParameterType::BOOLEAN]));
+        $enabled = $this->ids($connection->fetchFirstColumn(sprintf('SELECT id FROM %s WHERE enabled = ?', $endpointTable), [true], [ParameterType::BOOLEAN]));
         if ([] !== $enabled && $this->exists($connection, $table, $enabled, [WebhookDeliveryInterface::STATUS_SUSPENDED])) {
             $changed += (int) $connection->executeStatement(
                 sprintf(
@@ -217,7 +217,7 @@ final class DeliveryClaimer
      *
      * @return list<int>
      */
-    private static function ids(array $values): array
+    private function ids(array $values): array
     {
         return array_map(static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0, $values);
     }

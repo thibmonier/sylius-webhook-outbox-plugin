@@ -8,9 +8,9 @@ namespace Tmonier\SyliusWebhookOutboxPlugin\Http;
  * Static URL rules, checked by the admin form and again before each delivery. Private
  * addresses are blocked at connection time by NoPrivateNetworkHttpClient (DNS included).
  */
-final class EndpointUrlPolicy
+final readonly class EndpointUrlPolicy
 {
-    public function __construct(private readonly bool $allowHttp = false)
+    public function __construct(private bool $allowHttp = false)
     {
     }
 
@@ -27,7 +27,7 @@ final class EndpointUrlPolicy
         }
 
         $scheme = strtolower($parts['scheme']);
-        if ('https' !== $scheme && !('http' === $scheme && $this->allowHttp)) {
+        if ('https' !== $scheme && ('http' !== $scheme || !$this->allowHttp)) {
             return $this->allowHttp ? 'tmonier_webhook.endpoint.url.http_or_https' : 'tmonier_webhook.endpoint.url.https_only';
         }
 

@@ -11,9 +11,9 @@ use Tmonier\SyliusWebhookOutboxPlugin\Outbox\LazyValue;
  * Absolute admin URL of a resource ("admin_url" of the payloads). In console commands and
  * workers, the host comes from framework.router.default_uri.
  */
-final class AdminUrlGenerator
+final readonly class AdminUrlGenerator
 {
-    public function __construct(private readonly UrlGeneratorInterface $urlGenerator)
+    public function __construct(private UrlGeneratorInterface $urlGenerator)
     {
     }
 

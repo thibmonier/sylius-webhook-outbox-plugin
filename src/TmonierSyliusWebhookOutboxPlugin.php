@@ -25,7 +25,7 @@ final class TmonierSyliusWebhookOutboxPlugin extends Bundle
 
         // dump(), the profiler and the toolbar must not show endpoint secrets nor raw URLs.
         if (class_exists(AbstractCloner::class)) {
-            AbstractCloner::$defaultCasters[WebhookEndpointInterface::class] = [WebhookEndpointCaster::class, 'cast'];
+            AbstractCloner::$defaultCasters[WebhookEndpointInterface::class] = WebhookEndpointCaster::cast(...);
         }
     }
 

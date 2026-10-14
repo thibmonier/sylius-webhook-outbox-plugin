@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tmonier\SyliusWebhookOutboxPlugin\Delivery;
 
-final class WebhookRequest
+final readonly class WebhookRequest
 {
     /** @param array<string, string> $headers */
     public function __construct(
-        public readonly string $url,
-        public readonly string $body,
-        public readonly array $headers,
+        public string $url,
+        public string $body,
+        public array $headers,
     ) {
     }
 }

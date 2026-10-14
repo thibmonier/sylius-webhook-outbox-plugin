@@ -8,7 +8,7 @@ namespace Tmonier\SyliusWebhookOutboxPlugin\Maintenance;
  * Replaces personal values of a payload by null, whatever their depth. Ids, codes, amounts and
  * states are kept so that the event stays meaningful for statistics.
  */
-final class PayloadRedactor
+final readonly class PayloadRedactor
 {
     public const PERSONAL_KEYS = [
         'email',
@@ -29,7 +29,7 @@ final class PayloadRedactor
     ];
 
     /** @param list<string> $personalKeys */
-    public function __construct(private readonly array $personalKeys = self::PERSONAL_KEYS)
+    public function __construct(private array $personalKeys = self::PERSONAL_KEYS)
     {
     }
 

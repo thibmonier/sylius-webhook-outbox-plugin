@@ -12,26 +12,11 @@ class OutboxEvent implements OutboxEventInterface
 {
     protected string $id;
 
-    protected string $type;
-
-    protected int $version;
-
     protected \DateTimeImmutable $occurredAt;
-
-    protected ?string $channelCode;
-
-    protected ?string $resourceType;
 
     protected ?string $resourceId = null;
 
     protected ?int $customerId = null;
-
-    /**
-     * Doctrine "json" column. A DeferredPayload until the row is inserted, an array afterwards.
-     *
-     * @var array<string, mixed>|DeferredPayload
-     */
-    protected array|DeferredPayload $payload;
 
     protected ?\DateTimeImmutable $anonymizedAt = null;
 
@@ -44,23 +29,21 @@ class OutboxEvent implements OutboxEventInterface
      * @param array<string, mixed>|DeferredPayload $payload
      */
     public function __construct(
-        string $type,
-        int $version,
+        protected string $type,
+        protected int $version,
         \DateTimeImmutable $occurredAt,
-        array|DeferredPayload $payload,
-        ?string $channelCode = null,
-        ?string $resourceType = null,
+        /**
+         * Doctrine "json" column. A DeferredPayload until the row is inserted, an array afterwards.
+         */
+        protected array|DeferredPayload $payload,
+        protected ?string $channelCode = null,
+        protected ?string $resourceType = null,
         int|string|LazyValue|null $resourceId = null,
         int|string|LazyValue|null $customerId = null,
         ?string $id = null,
     ) {
         $this->id = $id ?? Uuid::v7()->toRfc4122();
-        $this->type = $type;
-        $this->version = $version;
         $this->occurredAt = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
-        $this->payload = $payload;
-        $this->channelCode = $channelCode;
-        $this->resourceType = $resourceType;
         $this->pendingResourceId = $resourceId;
         $this->pendingCustomerId = $customerId;
         $this->resolveReferences();
@@ -129,7 +112,7 @@ class OutboxEvent implements OutboxEventInterface
 
     public function isAnonymized(): bool
     {
-        return null !== $this->anonymizedAt;
+        return $this->anonymizedAt instanceof \DateTimeImmutable;
     }
 
     public function resolveReferences(): bool

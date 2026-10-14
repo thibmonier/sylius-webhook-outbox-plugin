@@ -11,7 +11,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Outbox\LazyValue;
  * Customer DTO, version 1 (see README, "Payloads"). Never exposes the shop user: no password,
  * no token, no roles; only whether the customer has an account.
  */
-final class CustomerPayloadNormalizer
+final readonly class CustomerPayloadNormalizer
 {
     public const VERSION = 1;
 
@@ -29,7 +29,7 @@ final class CustomerPayloadNormalizer
         'subscribedToNewsletter' => 'subscribed_to_newsletter',
     ];
 
-    public function __construct(private readonly AdminUrlGenerator $adminUrlGenerator)
+    public function __construct(private AdminUrlGenerator $adminUrlGenerator)
     {
     }
 
@@ -49,7 +49,7 @@ final class CustomerPayloadNormalizer
             'birthday' => $customer->getBirthday()?->format('Y-m-d'),
             'group' => $customer->getGroup()?->getCode(),
             'subscribed_to_newsletter' => $customer->isSubscribedToNewsletter(),
-            'has_account' => null !== $customer->getUser(),
+            'has_account' => $customer->getUser() instanceof \Sylius\Component\User\Model\UserInterface,
             'created_at' => Dates::format($customer->getCreatedAt()),
         ];
     }
@@ -61,7 +61,7 @@ final class CustomerPayloadNormalizer
      */
     public function summarize(?CustomerInterface $customer): ?array
     {
-        if (null === $customer) {
+        if (!$customer instanceof \Sylius\Component\Core\Model\CustomerInterface) {
             return null;
         }
 
@@ -71,7 +71,7 @@ final class CustomerPayloadNormalizer
             'first_name' => $customer->getFirstName(),
             'last_name' => $customer->getLastName(),
             'phone_number' => $customer->getPhoneNumber(),
-            'has_account' => null !== $customer->getUser(),
+            'has_account' => $customer->getUser() instanceof \Sylius\Component\User\Model\UserInterface,
         ];
     }
 }

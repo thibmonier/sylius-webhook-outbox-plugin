@@ -11,7 +11,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Entity\DeliveryAttempt;
  * [0, 5, 300, ...] means "immediately, then 5 s after the first failure, 5 min after the
  * second..."; its length is the number of attempts before the delivery goes dead.
  */
-final class RetryPolicy
+final readonly class RetryPolicy
 {
     /** Retry-After is honoured on these statuses. */
     public const RETRY_AFTER_STATUSES = [429, 502, 503, 504];
@@ -20,7 +20,7 @@ final class RetryPolicy
     public const MAX_RETRY_AFTER = 86400;
 
     /** @var \Closure(int): int */
-    private readonly \Closure $random;
+    private \Closure $random;
 
     /**
      * @param list<int> $schedule
@@ -28,8 +28,8 @@ final class RetryPolicy
      * @param (\Closure(int): int)|null $random random integer between 0 and the given maximum
      */
     public function __construct(
-        private readonly array $schedule,
-        private readonly float $jitter = 0.1,
+        private array $schedule,
+        private float $jitter = 0.1,
         ?\Closure $random = null,
     ) {
         if ([] === $schedule) {
@@ -64,7 +64,7 @@ final class RetryPolicy
         }
 
         if (null !== $lastAttempt->retryAfterSeconds && in_array($lastAttempt->statusCode, self::RETRY_AFTER_STATUSES, true)) {
-            $delay = max($delay, min($lastAttempt->retryAfterSeconds, self::MAX_RETRY_AFTER));
+            return max($delay, min($lastAttempt->retryAfterSeconds, self::MAX_RETRY_AFTER));
         }
 
         return $delay;

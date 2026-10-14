@@ -465,7 +465,7 @@ final class TransactionalOutboxTest extends KernelTestCase
         try {
             // ...worker A skips it instead of waiting, and claims another one.
             $claims = [];
-            while (null !== $claim = $claimer->claimNext()) {
+            while (($claim = $claimer->claimNext()) instanceof \Tmonier\SyliusWebhookOutboxPlugin\Delivery\DeliveryClaim) {
                 $claims[] = $claim->deliveryId;
                 if (count($claims) > 50) {
                     break;

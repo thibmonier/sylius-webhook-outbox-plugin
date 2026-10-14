@@ -14,7 +14,7 @@ final class EventTypeRegistryTest extends TestCase
 {
     public function testCoreAndThirdPartyTypes(): void
     {
-        $registry = new EventTypeRegistry([new CoreEventTypeProvider(), self::provider(new EventType('quote.accepted', 2))], [
+        $registry = new EventTypeRegistry([new CoreEventTypeProvider(), $this->provider(new EventType('quote.accepted', 2))], [
             'product_variant.stock_changed' => ['enabled' => false],
         ]);
 
@@ -32,7 +32,7 @@ final class EventTypeRegistryTest extends TestCase
 
     public function testDuplicatesAndInvalidNames(): void
     {
-        $registry = new EventTypeRegistry([self::provider(new EventType('order.paid')), new CoreEventTypeProvider()]);
+        $registry = new EventTypeRegistry([$this->provider(new EventType('order.paid')), new CoreEventTypeProvider()]);
 
         try {
             $registry->all();
@@ -50,7 +50,7 @@ final class EventTypeRegistryTest extends TestCase
         (new EventTypeRegistry([]))->get('order.paid');
     }
 
-    private static function provider(EventType ...$types): EventTypeProviderInterface
+    private function provider(EventType ...$types): EventTypeProviderInterface
     {
         return new class(array_values($types)) implements EventTypeProviderInterface {
             /** @param list<EventType> $types */

@@ -22,14 +22,14 @@ use Tmonier\SyliusWebhookOutboxPlugin\Outbox\OutboxRecorder;
  *    to): the ids unknown at onFlush time (resource_id, customer_id of new orders and customers)
  *    are written with one UPDATE on the same connection.
  */
-final class OutboxCaptureListener
+final readonly class OutboxCaptureListener
 {
     /** @param iterable<ChangeDetectorInterface> $detectors */
     public function __construct(
-        private readonly iterable $detectors,
-        private readonly OutboxRecorder $recorder,
-        private readonly LoggerInterface $logger,
-        private readonly bool $enabled = true,
+        private iterable $detectors,
+        private OutboxRecorder $recorder,
+        private LoggerInterface $logger,
+        private bool $enabled = true,
     ) {
     }
 

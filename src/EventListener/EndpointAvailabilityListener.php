@@ -18,12 +18,12 @@ use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
  *
  * postUpdate runs inside the flush transaction, after the endpoint row was updated.
  */
-final class EndpointAvailabilityListener
+final readonly class EndpointAvailabilityListener
 {
     /** @param class-string<WebhookDeliveryInterface> $deliveryClass */
     public function __construct(
-        private readonly ClockInterface $clock,
-        private readonly string $deliveryClass,
+        private ClockInterface $clock,
+        private string $deliveryClass,
     ) {
     }
 

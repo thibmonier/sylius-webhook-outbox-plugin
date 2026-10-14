@@ -39,7 +39,7 @@ final class OutboxRecorder implements OutboxRecorderInterface
 
     public function record(WebhookEvent $event, ?WebhookEndpointInterface $endpoint = null): ?OutboxEventInterface
     {
-        if (null === $endpoint) {
+        if (!$endpoint instanceof \Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface) {
             if (!$this->enabled || !$this->eventTypes->isEnabled($event->type)) {
                 return null;
             }
@@ -69,7 +69,7 @@ final class OutboxRecorder implements OutboxRecorderInterface
             $this->nextId(),
         );
         $entityManager->persist($outboxEvent);
-        if (null !== $this->flushing) {
+        if ($this->flushing instanceof \Doctrine\ORM\EntityManagerInterface) {
             $uow->computeChangeSet($entityManager->getClassMetadata($outboxEvent::class), $outboxEvent);
         }
 
@@ -78,7 +78,7 @@ final class OutboxRecorder implements OutboxRecorderInterface
         foreach ($endpoints as $target) {
             $delivery = new $deliveryClass($outboxEvent, $target, $now, null, $firstAttemptAt);
             $entityManager->persist($delivery);
-            if (null !== $this->flushing) {
+            if ($this->flushing instanceof \Doctrine\ORM\EntityManagerInterface) {
                 $uow->computeChangeSet($entityManager->getClassMetadata($delivery::class), $delivery);
             }
         }

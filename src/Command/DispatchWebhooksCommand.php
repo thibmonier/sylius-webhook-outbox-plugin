@@ -53,7 +53,7 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
 
     public function getSubscribedSignals(): array
     {
-        return \defined('SIGTERM') ? [\SIGTERM, \SIGINT] : [];
+        return \defined('SIGTERM') ? [SIGTERM, SIGINT] : [];
     }
 
     public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
@@ -67,9 +67,9 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $loop = (bool) $input->getOption('loop');
-        $timeLimit = self::positiveInt($input->getOption('time-limit'));
-        $limit = self::positiveInt($input->getOption('limit'));
-        $sleep = max(0.1, (float) self::numeric($input->getOption('sleep')));
+        $timeLimit = $this->positiveInt($input->getOption('time-limit'));
+        $limit = $this->positiveInt($input->getOption('limit'));
+        $sleep = max(0.1, (float) $this->numeric($input->getOption('sleep')));
         if ($timeLimit > 0 && $timeLimit <= $this->maxDuration) {
             $output->writeln(sprintf('<error>--time-limit must be greater than max_duration (%s s): no request could start.</error>', $this->maxDuration));
 
@@ -103,7 +103,7 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
                 continue;
             }
 
-            if (null === $delivery) {
+            if (!$delivery instanceof \Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface) {
                 if (!$loop) {
                     break;
                 }
@@ -140,12 +140,12 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
         return Command::SUCCESS;
     }
 
-    private static function positiveInt(mixed $value): int
+    private function positiveInt(mixed $value): int
     {
-        return max(0, (int) self::numeric($value));
+        return max(0, (int) $this->numeric($value));
     }
 
-    private static function numeric(mixed $value): float|int
+    private function numeric(mixed $value): float|int
     {
         if (!is_numeric($value)) {
             throw new \InvalidArgumentException(sprintf('Expected a number, "%s" given.', is_scalar($value) ? (string) $value : get_debug_type($value)));

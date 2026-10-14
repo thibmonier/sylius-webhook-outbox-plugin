@@ -64,7 +64,7 @@ final class UrlRedactor
 
         $path = '';
         if (isset($parts['path']) && '' !== $parts['path']) {
-            $prefix = self::knownHookPrefix($parts['host'], $parts['path']);
+            $prefix = $this->knownHookPrefix($parts['host'], $parts['path']);
             if (null !== $prefix) {
                 $rest = substr($parts['path'], strlen($prefix));
                 $path = $prefix . implode('/', array_map(static fn (string $segment): string => '' === $segment ? '' : self::REDACTED, explode('/', $rest)));
@@ -87,7 +87,7 @@ final class UrlRedactor
         );
     }
 
-    private static function knownHookPrefix(string $host, string $path): ?string
+    private function knownHookPrefix(string $host, string $path): ?string
     {
         foreach (self::KNOWN_HOOK_PATHS as $hostPattern => $prefix) {
             if (1 === preg_match($hostPattern, $host) && 0 === stripos($path, $prefix)) {

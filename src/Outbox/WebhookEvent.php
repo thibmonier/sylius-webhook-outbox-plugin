@@ -8,7 +8,7 @@ namespace Tmonier\SyliusWebhookOutboxPlugin\Outbox;
  * An event to record in the outbox. "data" is the versioned DTO of the type (arrays and
  * scalars only; LazyValue for what the flush has not computed yet).
  */
-final class WebhookEvent
+final readonly class WebhookEvent
 {
     /**
      * @param array<string, mixed> $data
@@ -16,12 +16,12 @@ final class WebhookEvent
      * @param int|string|LazyValue|null $customerId customer whose personal data the payload holds (erasure)
      */
     public function __construct(
-        public readonly string $type,
-        public readonly array $data,
-        public readonly ?string $channelCode = null,
-        public readonly ?string $resourceType = null,
-        public readonly int|string|LazyValue|null $resourceId = null,
-        public readonly int|string|LazyValue|null $customerId = null,
+        public string $type,
+        public array $data,
+        public ?string $channelCode = null,
+        public ?string $resourceType = null,
+        public int|string|LazyValue|null $resourceId = null,
+        public int|string|LazyValue|null $customerId = null,
     ) {
     }
 }

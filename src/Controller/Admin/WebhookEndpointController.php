@@ -21,16 +21,16 @@ use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookEndpointRepositoryInterf
 use Tmonier\SyliusWebhookOutboxPlugin\Signature\SecretGenerator;
 
 /** Endpoint actions besides the CRUD: regenerate the secret, ping. */
-final class WebhookEndpointController
+final readonly class WebhookEndpointController
 {
     public function __construct(
-        private readonly WebhookEndpointRepositoryInterface $repository,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly SecretGenerator $secretGenerator,
-        private readonly SecretRevealer $revealer,
-        private readonly OutboxRecorderInterface $recorder,
-        private readonly CsrfTokenManagerInterface $csrfTokenManager,
-        private readonly UrlGeneratorInterface $urlGenerator,
+        private WebhookEndpointRepositoryInterface $repository,
+        private EntityManagerInterface $entityManager,
+        private SecretGenerator $secretGenerator,
+        private SecretRevealer $revealer,
+        private OutboxRecorderInterface $recorder,
+        private CsrfTokenManagerInterface $csrfTokenManager,
+        private UrlGeneratorInterface $urlGenerator,
     ) {
     }
 
@@ -47,7 +47,7 @@ final class WebhookEndpointController
         return $this->revealer->reveal($endpoint, false);
     }
 
-    public function pingAction(Request $request, int $id): Response
+    public function pingAction(Request $request, int $id): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         $endpoint = $this->find($id);
         if (!$this->isCsrfTokenValid($request, $id)) {

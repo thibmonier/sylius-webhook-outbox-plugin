@@ -20,11 +20,11 @@ use Tmonier\SyliusWebhookOutboxPlugin\Payload\CustomerPayloadNormalizer;
  * customer.updated, only when a field of CustomerPayloadNormalizer::UPDATE_FIELDS changes or
  * when an existing customer gets a shop account ("has_account").
  */
-final class CustomerEventDetector implements ChangeDetectorInterface
+final readonly class CustomerEventDetector implements ChangeDetectorInterface
 {
     public function __construct(
-        private readonly CustomerPayloadNormalizer $normalizer,
-        private readonly EntityGuard $guard,
+        private CustomerPayloadNormalizer $normalizer,
+        private EntityGuard $guard,
     ) {
     }
 
@@ -49,7 +49,7 @@ final class CustomerEventDetector implements ChangeDetectorInterface
 
             $changed = [];
             foreach ($unitOfWork->getEntityChangeSet($customer) as $field => $change) {
-                if (isset(CustomerPayloadNormalizer::UPDATE_FIELDS[$field]) && is_array($change) && !self::same($change[0] ?? null, $change[1] ?? null)) {
+                if (isset(CustomerPayloadNormalizer::UPDATE_FIELDS[$field]) && is_array($change) && !$this->same($change[0] ?? null, $change[1] ?? null)) {
                     $changed[] = CustomerPayloadNormalizer::UPDATE_FIELDS[$field];
                 }
             }
@@ -91,7 +91,7 @@ final class CustomerEventDetector implements ChangeDetectorInterface
         return new WebhookEvent($type, $data, null, 'customer', $id, $id);
     }
 
-    private static function same(mixed $old, mixed $new): bool
+    private function same(mixed $old, mixed $new): bool
     {
         if ($old instanceof \DateTimeInterface && $new instanceof \DateTimeInterface) {
             return $old->format('Y-m-d') === $new->format('Y-m-d');

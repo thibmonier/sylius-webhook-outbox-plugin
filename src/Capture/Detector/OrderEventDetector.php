@@ -22,7 +22,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Payload\OrderPayloadNormalizer;
  * state columns of the order. Works whatever the entry point (shop, API, admin, CLI), as long as
  * the change is flushed through Doctrine.
  */
-final class OrderEventDetector implements ChangeDetectorInterface
+final readonly class OrderEventDetector implements ChangeDetectorInterface
 {
     /** Event type => [order field, target state]. Order matters: placed before paid. */
     private const TRANSITIONS = [
@@ -33,8 +33,8 @@ final class OrderEventDetector implements ChangeDetectorInterface
     ];
 
     public function __construct(
-        private readonly OrderPayloadNormalizer $normalizer,
-        private readonly EntityGuard $guard,
+        private OrderPayloadNormalizer $normalizer,
+        private EntityGuard $guard,
     ) {
     }
 
@@ -47,7 +47,7 @@ final class OrderEventDetector implements ChangeDetectorInterface
             // Orders created directly in their final state (admin order creation, imports).
             $reached = [];
             foreach (self::TRANSITIONS as $type => [$field, $state]) {
-                if (CoreEventTypeProvider::ORDER_CANCELLED !== $type && $state === self::current($order, $field)) {
+                if (CoreEventTypeProvider::ORDER_CANCELLED !== $type && $state === $this->current($order, $field)) {
                     $reached[] = $type;
                 }
             }
@@ -93,12 +93,12 @@ final class OrderEventDetector implements ChangeDetectorInterface
                 $order->getChannel()?->getCode(),
                 'order',
                 LazyValue::idOf($order),
-                null === $customer ? null : LazyValue::idOf($customer),
+                $customer instanceof \Sylius\Component\Customer\Model\CustomerInterface ? LazyValue::idOf($customer) : null,
             );
         }
     }
 
-    private static function current(OrderInterface $order, string $field): ?string
+    private function current(OrderInterface $order, string $field): ?string
     {
         return match ($field) {
             'checkoutState' => $order->getCheckoutState(),

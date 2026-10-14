@@ -24,20 +24,20 @@ use Tmonier\SyliusWebhookOutboxPlugin\Signature\WebhookSigner;
  * recording fails, the claim is released and a closed entity manager is reset, so that a
  * long-running worker keeps working.
  */
-final class WebhookDispatcher
+final readonly class WebhookDispatcher
 {
     /** @param class-string<WebhookDeliveryInterface> $deliveryClass */
     public function __construct(
-        private readonly ManagerRegistry $registry,
-        private readonly DeliveryClaimer $claimer,
-        private readonly WebhookSenderInterface $sender,
-        private readonly WebhookSigner $signer,
-        private readonly RetryPolicy $retryPolicy,
-        private readonly EndpointUrlPolicy $urlPolicy,
-        private readonly UrlRedactor $urlRedactor,
-        private readonly ClockInterface $clock,
-        private readonly LoggerInterface $logger,
-        private readonly string $deliveryClass,
+        private ManagerRegistry $registry,
+        private DeliveryClaimer $claimer,
+        private WebhookSenderInterface $sender,
+        private WebhookSigner $signer,
+        private RetryPolicy $retryPolicy,
+        private EndpointUrlPolicy $urlPolicy,
+        private UrlRedactor $urlRedactor,
+        private ClockInterface $clock,
+        private LoggerInterface $logger,
+        private string $deliveryClass,
     ) {
     }
 
@@ -45,7 +45,7 @@ final class WebhookDispatcher
     public function dispatchNext(): ?WebhookDeliveryInterface
     {
         $claim = $this->claimer->claimNext();
-        if (null === $claim) {
+        if (!$claim instanceof \Tmonier\SyliusWebhookOutboxPlugin\Delivery\DeliveryClaim) {
             return null;
         }
 

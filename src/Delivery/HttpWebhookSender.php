@@ -15,15 +15,15 @@ use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
  * Default sender. The HTTP client is the plugin's dedicated client (SSRF guard, no redirect,
  * timeouts), see EndpointHttpClientFactory.
  */
-final class HttpWebhookSender implements WebhookSenderInterface
+final readonly class HttpWebhookSender implements WebhookSenderInterface
 {
     public const USER_AGENT = 'Sylius-Webhook-Outbox/1.0 (+https://github.com/thibmonier/sylius-webhook-outbox-plugin)';
 
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
-        private readonly ClockInterface $clock,
-        private readonly int $responseBodyMaxBytes = 2048,
-        private readonly UrlRedactor $urlRedactor = new UrlRedactor(),
+        private HttpClientInterface $httpClient,
+        private ClockInterface $clock,
+        private int $responseBodyMaxBytes = 2048,
+        private UrlRedactor $urlRedactor = new UrlRedactor(),
     ) {
     }
 
@@ -41,10 +41,10 @@ final class HttpWebhookSender implements WebhookSenderInterface
             $retryAfter = RetryPolicy::parseRetryAfter($response->getHeaders(false)['retry-after'][0] ?? null, $at);
             $body = $this->readBody($response);
         } catch (ExceptionInterface $exception) {
-            return new DeliveryAttempt($at, self::elapsedMs($start), null, null, $this->urlRedactor->redactMessage($exception->getMessage(), $request->url));
+            return new DeliveryAttempt($at, $this->elapsedMs($start), null, null, $this->urlRedactor->redactMessage($exception->getMessage(), $request->url));
         }
 
-        return new DeliveryAttempt($at, self::elapsedMs($start), $statusCode, $body, null, $retryAfter);
+        return new DeliveryAttempt($at, $this->elapsedMs($start), $statusCode, $body, null, $retryAfter);
     }
 
     /** First bytes of the response body, the rest is not downloaded. */
@@ -80,7 +80,7 @@ final class HttpWebhookSender implements WebhookSenderInterface
         return mb_convert_encoding($body, 'UTF-8', 'UTF-8');
     }
 
-    private static function elapsedMs(int|float $start): int
+    private function elapsedMs(int|float $start): int
     {
         return (int) round((hrtime(true) - $start) / 1_000_000);
     }
