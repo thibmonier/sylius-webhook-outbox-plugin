@@ -174,7 +174,7 @@ final class CaptureTest extends KernelTestCase
 
         $event = $recorder->record(new WebhookEvent('order.paid', ['id' => 1]));
         self::assertNotNull($event);
-        self::assertSame([], $this->eventsOfType('order.paid', null), 'Not written before the flush.');
+        self::assertSame([], $this->eventsOfType('order.paid'), 'Not written before the flush.');
 
         $this->entityManager()->flush();
         self::assertCount(1, $this->deliveriesOf($endpoint));

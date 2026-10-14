@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tmonier\SyliusWebhookOutboxPlugin\Delivery;
 
-final class DeliveryClaim
+final readonly class DeliveryClaim
 {
     public function __construct(
-        public readonly int $deliveryId,
-        public readonly string $token,
+        public int $deliveryId,
+        public string $token,
     ) {
     }
 }

@@ -16,13 +16,13 @@ use Tmonier\SyliusWebhookOutboxPlugin\Outbox\LazyValue;
  * Order DTO, version 1 (see README, "Payloads"). Amounts are integers in the minor unit of
  * currency_code. The order token and the customer IP are never exposed.
  */
-final class OrderPayloadNormalizer
+final readonly class OrderPayloadNormalizer
 {
     public const VERSION = 1;
 
     public function __construct(
-        private readonly AdminUrlGenerator $adminUrlGenerator,
-        private readonly CustomerPayloadNormalizer $customerNormalizer,
+        private AdminUrlGenerator $adminUrlGenerator,
+        private CustomerPayloadNormalizer $customerNormalizer,
     ) {
     }
 
@@ -53,19 +53,19 @@ final class OrderPayloadNormalizer
             ],
             'promotion_coupon' => $order->getPromotionCoupon()?->getCode(),
             'customer' => $this->customerNormalizer->summarize($customer instanceof CustomerInterface ? $customer : null),
-            'billing_address' => self::address($order->getBillingAddress()),
-            'shipping_address' => self::address($order->getShippingAddress()),
-            'items' => array_values(array_map(self::item(...), $order->getItems()->toArray())),
-            'payments' => array_values(array_map(self::payment(...), $order->getPayments()->toArray())),
-            'shipments' => array_values(array_map(self::shipment(...), $order->getShipments()->toArray())),
+            'billing_address' => $this->address($order->getBillingAddress()),
+            'shipping_address' => $this->address($order->getShippingAddress()),
+            'items' => array_values(array_map($this->item(...), $order->getItems()->toArray())),
+            'payments' => array_values(array_map($this->payment(...), $order->getPayments()->toArray())),
+            'shipments' => array_values(array_map($this->shipment(...), $order->getShipments()->toArray())),
             'notes' => $order->getNotes(),
         ];
     }
 
     /** @return array<string, mixed>|null */
-    private static function address(?AddressInterface $address): ?array
+    private function address(?AddressInterface $address): ?array
     {
-        if (null === $address) {
+        if (!$address instanceof \Sylius\Component\Core\Model\AddressInterface) {
             return null;
         }
 
@@ -84,7 +84,7 @@ final class OrderPayloadNormalizer
     }
 
     /** @return array<string, mixed> */
-    private static function item(mixed $item): array
+    private function item(mixed $item): array
     {
         \assert($item instanceof OrderItemInterface);
 
@@ -101,7 +101,7 @@ final class OrderPayloadNormalizer
     }
 
     /** @return array<string, mixed> */
-    private static function payment(mixed $payment): array
+    private function payment(mixed $payment): array
     {
         \assert($payment instanceof PaymentInterface);
 
@@ -115,7 +115,7 @@ final class OrderPayloadNormalizer
     }
 
     /** @return array<string, mixed> */
-    private static function shipment(mixed $shipment): array
+    private function shipment(mixed $shipment): array
     {
         \assert($shipment instanceof ShipmentInterface);
 

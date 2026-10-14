@@ -24,7 +24,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
 
     public function load(array $configs, ContainerBuilder $container): void
     {
-        $config = self::config($this->processConfiguration(new Configuration(), $configs));
+        $config = $this->config($this->processConfiguration(new Configuration(), $configs));
 
         $this->registerResources('tmonier_webhook', $config['driver'], $config['models'], $container);
 
@@ -51,7 +51,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
 
     public function prepend(ContainerBuilder $container): void
     {
-        $config = self::config($this->processConfiguration(new Configuration(), $container->getExtensionConfig($this->getAlias())));
+        $config = $this->config($this->processConfiguration(new Configuration(), $container->getExtensionConfig($this->getAlias())));
         foreach ($config['models'] as $name => $model) {
             $container->setParameter(sprintf('tmonier_webhook.model.%s.class', $name), $model['classes']['model']);
         }
@@ -91,7 +91,7 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
      *     models: array<string, array{classes: array{model: class-string, interface: class-string, controller: class-string, factory: class-string, repository: class-string, form?: class-string}}>,
      * }
      */
-    private static function config(array $config): array
+    private function config(array $config): array
     {
         /** @phpstan-ignore return.type (shape enforced by the configuration tree) */
         return $config;

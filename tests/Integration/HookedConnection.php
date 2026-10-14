@@ -18,7 +18,7 @@ final class HookedConnection extends Connection
     public function fetchFirstColumn(string $query, array $params = [], array $types = []): array
     {
         $result = parent::fetchFirstColumn($query, $params, $types);
-        if (null !== self::$afterEndpointRead && str_contains($query, 'enabled')) {
+        if (self::$afterEndpointRead instanceof \Closure && str_contains($query, 'enabled')) {
             $callback = self::$afterEndpointRead;
             self::$afterEndpointRead = null;
             $callback();

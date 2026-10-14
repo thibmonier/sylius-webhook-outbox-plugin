@@ -69,7 +69,7 @@ class WebhookDelivery implements WebhookDeliveryInterface
     {
         $next = $this->getNextAttemptAt();
 
-        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_FAILED], true) && null !== $next && $next <= $now;
+        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_FAILED], true) && $next instanceof \DateTimeImmutable && $next <= $now;
     }
 
     public function getAttempts(): int
@@ -79,22 +79,22 @@ class WebhookDelivery implements WebhookDeliveryInterface
 
     public function getNextAttemptAt(): ?\DateTimeImmutable
     {
-        return self::utc($this->nextAttemptAt);
+        return $this->utc($this->nextAttemptAt);
     }
 
     public function getLastAttemptAt(): ?\DateTimeImmutable
     {
-        return self::utc($this->lastAttemptAt);
+        return $this->utc($this->lastAttemptAt);
     }
 
     public function getDeliveredAt(): ?\DateTimeImmutable
     {
-        return self::utc($this->deliveredAt);
+        return $this->utc($this->deliveredAt);
     }
 
     public function getCreatedAt(): \DateTimeImmutable
     {
-        return self::utc($this->createdAt) ?? $this->createdAt;
+        return $this->utc($this->createdAt) ?? $this->createdAt;
     }
 
     public function getLastResponseStatus(): ?int
@@ -185,9 +185,9 @@ class WebhookDelivery implements WebhookDeliveryInterface
         );
     }
 
-    private static function utc(?\DateTimeImmutable $date): ?\DateTimeImmutable
+    private function utc(?\DateTimeImmutable $date): ?\DateTimeImmutable
     {
         // Stored in UTC without time zone: read it back as UTC whatever the PHP default.
-        return null === $date ? null : new \DateTimeImmutable($date->format('Y-m-d H:i:s'), new \DateTimeZone('UTC'));
+        return $date instanceof \DateTimeImmutable ? new \DateTimeImmutable($date->format('Y-m-d H:i:s'), new \DateTimeZone('UTC')) : null;
     }
 }

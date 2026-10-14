@@ -12,9 +12,9 @@ use Tmonier\SyliusWebhookOutboxPlugin\Outbox\WebhookEvent;
  * and id, and the other entities of the flush still get their events. A webhook bug never
  * breaks the business flush.
  */
-final class EntityGuard
+final readonly class EntityGuard
 {
-    public function __construct(private readonly LoggerInterface $logger)
+    public function __construct(private LoggerInterface $logger)
     {
     }
 

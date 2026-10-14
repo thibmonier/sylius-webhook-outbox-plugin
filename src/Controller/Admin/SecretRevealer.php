@@ -12,9 +12,9 @@ use Twig\Environment;
  * The only page that ever shows an endpoint secret: answered directly to the POST that created
  * or regenerated it, never cached, never stored in the session.
  */
-final class SecretRevealer
+final readonly class SecretRevealer
 {
-    public function __construct(private readonly Environment $twig)
+    public function __construct(private Environment $twig)
     {
     }
 

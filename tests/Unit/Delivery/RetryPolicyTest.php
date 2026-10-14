@@ -14,7 +14,7 @@ final class RetryPolicyTest extends TestCase
     public function testDefaultScheduleWithoutJitter(): void
     {
         $policy = new RetryPolicy(Configuration::DEFAULT_RETRY_SCHEDULE, 0.0);
-        $failure = self::attempt(500);
+        $failure = $this->attempt(500);
 
         self::assertSame(10, $policy->maxAttempts());
         self::assertSame(0, $policy->firstAttemptDelay());
@@ -34,7 +34,7 @@ final class RetryPolicyTest extends TestCase
             return $max;
         });
 
-        self::assertSame(110, $policy->nextDelay(1, self::attempt(500)));
+        self::assertSame(110, $policy->nextDelay(1, $this->attempt(500)));
         self::assertSame([10], $maxima);
     }
 
@@ -42,11 +42,11 @@ final class RetryPolicyTest extends TestCase
     {
         $policy = new RetryPolicy([0, 5, 300], 0.0);
 
-        self::assertSame(120, $policy->nextDelay(1, self::attempt(429, 120)));
-        self::assertSame(120, $policy->nextDelay(1, self::attempt(503, 120)));
-        self::assertSame(5, $policy->nextDelay(1, self::attempt(500, 120)), 'Ignored on 500.');
-        self::assertSame(300, $policy->nextDelay(2, self::attempt(429, 10)), 'Never shorter than the schedule.');
-        self::assertSame(RetryPolicy::MAX_RETRY_AFTER, $policy->nextDelay(1, self::attempt(429, 10_000_000)));
+        self::assertSame(120, $policy->nextDelay(1, $this->attempt(429, 120)));
+        self::assertSame(120, $policy->nextDelay(1, $this->attempt(503, 120)));
+        self::assertSame(5, $policy->nextDelay(1, $this->attempt(500, 120)), 'Ignored on 500.');
+        self::assertSame(300, $policy->nextDelay(2, $this->attempt(429, 10)), 'Never shorter than the schedule.');
+        self::assertSame(RetryPolicy::MAX_RETRY_AFTER, $policy->nextDelay(1, $this->attempt(429, 10_000_000)));
     }
 
     public function testParseRetryAfter(): void
@@ -69,7 +69,7 @@ final class RetryPolicyTest extends TestCase
         new RetryPolicy([]);
     }
 
-    private static function attempt(int $status, ?int $retryAfter = null): DeliveryAttempt
+    private function attempt(int $status, ?int $retryAfter = null): DeliveryAttempt
     {
         return new DeliveryAttempt(new \DateTimeImmutable(), 10, $status, null, null, $retryAfter);
     }

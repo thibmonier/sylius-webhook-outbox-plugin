@@ -13,7 +13,7 @@ final class ConfigurationTest extends TestCase
 {
     public function testDefaults(): void
     {
-        $config = self::process([]);
+        $config = $this->process([]);
 
         self::assertTrue($config['enabled']);
         self::assertSame([], $config['events']);
@@ -28,7 +28,7 @@ final class ConfigurationTest extends TestCase
 
     public function testCustomValues(): void
     {
-        $config = self::process([
+        $config = $this->process([
             'events' => ['product_variant.stock_changed' => ['enabled' => false], 'order.paid' => null],
             'retry_schedule' => [0, 60],
             'retention_days' => null,
@@ -62,7 +62,7 @@ final class ConfigurationTest extends TestCase
     public function testInvalid(array $config): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        self::process($config);
+        $this->process($config);
     }
 
     /**
@@ -70,7 +70,7 @@ final class ConfigurationTest extends TestCase
      *
      * @return array<string, mixed>
      */
-    private static function process(array $config): array
+    private function process(array $config): array
     {
         /** @var array<string, mixed> $processed */
         $processed = (new Processor())->processConfiguration(new Configuration(), [$config]);

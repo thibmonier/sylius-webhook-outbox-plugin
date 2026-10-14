@@ -20,11 +20,11 @@ use Tmonier\SyliusWebhookOutboxPlugin\Payload\ProductVariantPayloadNormalizer;
  * previous values null). Placing an order holds stock on each of its
  * variants; without coalescing, every order would produce one event per line.
  */
-final class StockChangedDetector implements ChangeDetectorInterface
+final readonly class StockChangedDetector implements ChangeDetectorInterface
 {
     public function __construct(
-        private readonly ProductVariantPayloadNormalizer $normalizer,
-        private readonly EntityGuard $guard,
+        private ProductVariantPayloadNormalizer $normalizer,
+        private EntityGuard $guard,
     ) {
     }
 
@@ -46,8 +46,8 @@ final class StockChangedDetector implements ChangeDetectorInterface
             }
 
             $changeSet = $unitOfWork->getEntityChangeSet($variant);
-            $onHand = self::change($changeSet['onHand'] ?? null);
-            $onHold = self::change($changeSet['onHold'] ?? null);
+            $onHand = $this->change($changeSet['onHand'] ?? null);
+            $onHold = $this->change($changeSet['onHold'] ?? null);
             if (null === $onHand && null === $onHold) {
                 continue;
             }
@@ -85,7 +85,7 @@ final class StockChangedDetector implements ChangeDetectorInterface
     /**
      * @return array{0: int|null, 1: int|null}|null [old, new] when the value really changed
      */
-    private static function change(mixed $change): ?array
+    private function change(mixed $change): ?array
     {
         if (!is_array($change)) {
             return null;

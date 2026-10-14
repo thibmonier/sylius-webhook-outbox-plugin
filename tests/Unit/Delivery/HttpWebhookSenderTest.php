@@ -16,7 +16,7 @@ final class HttpWebhookSenderTest extends TestCase
     public function testSuccessKeepsATruncatedBody(): void
     {
         $client = new MockHttpClient(new MockResponse(str_repeat('a', 5000), ['http_code' => 202]));
-        $attempt = (new HttpWebhookSender($client, new MockClock('2026-10-11 10:00:00'), 2048))->send(self::request());
+        $attempt = (new HttpWebhookSender($client, new MockClock('2026-10-11 10:00:00'), 2048))->send($this->request());
 
         self::assertTrue($attempt->isSuccessful());
         self::assertSame(202, $attempt->statusCode);
@@ -32,7 +32,7 @@ final class HttpWebhookSenderTest extends TestCase
 
             return new MockResponse('');
         });
-        (new HttpWebhookSender($client, new MockClock()))->send(self::request());
+        (new HttpWebhookSender($client, new MockClock()))->send($this->request());
 
         self::assertContains('Content-Type: application/json', $seen);
         self::assertContains('webhook-id: msg_1', $seen);
@@ -41,7 +41,7 @@ final class HttpWebhookSenderTest extends TestCase
     public function testThrottlingWithRetryAfter(): void
     {
         $client = new MockHttpClient(new MockResponse('', ['http_code' => 429, 'response_headers' => ['Retry-After: 60']]));
-        $attempt = (new HttpWebhookSender($client, new MockClock()))->send(self::request());
+        $attempt = (new HttpWebhookSender($client, new MockClock()))->send($this->request());
 
         self::assertFalse($attempt->isSuccessful());
         self::assertSame(429, $attempt->statusCode);
@@ -64,13 +64,13 @@ final class HttpWebhookSenderTest extends TestCase
     public function testRedirectsAreNotFollowed(): void
     {
         $client = new MockHttpClient(new MockResponse('', ['http_code' => 301, 'response_headers' => ['Location: https://elsewhere.example.com/']]));
-        $attempt = (new HttpWebhookSender($client->withOptions(['max_redirects' => 0]), new MockClock()))->send(self::request());
+        $attempt = (new HttpWebhookSender($client->withOptions(['max_redirects' => 0]), new MockClock()))->send($this->request());
 
         self::assertSame(301, $attempt->statusCode);
         self::assertFalse($attempt->isSuccessful());
     }
 
-    private static function request(): WebhookRequest
+    private function request(): WebhookRequest
     {
         return new WebhookRequest('https://hooks.example.com/sylius', '{"id":"msg_1"}', ['webhook-id' => 'msg_1']);
     }

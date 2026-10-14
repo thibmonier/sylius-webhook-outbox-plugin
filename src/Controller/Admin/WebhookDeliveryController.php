@@ -8,7 +8,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -21,7 +20,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Repository\WebhookDeliveryRepositoryInterf
  * Retry now (same delivery, due immediately) and replay (new delivery of the same event, hence
  * the same webhook-id). The worker sends them: nothing is sent from the HTTP request.
  */
-final class WebhookDeliveryController
+final readonly class WebhookDeliveryController
 {
     public const BULK_TOKEN_ID = 'tmonier_webhook_bulk_replay';
 
@@ -29,16 +28,16 @@ final class WebhookDeliveryController
 
     /** @param class-string<WebhookDeliveryInterface> $deliveryClass */
     public function __construct(
-        private readonly WebhookDeliveryRepositoryInterface $repository,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly CsrfTokenManagerInterface $csrfTokenManager,
-        private readonly UrlGeneratorInterface $urlGenerator,
-        private readonly ClockInterface $clock,
-        private readonly string $deliveryClass,
+        private WebhookDeliveryRepositoryInterface $repository,
+        private EntityManagerInterface $entityManager,
+        private CsrfTokenManagerInterface $csrfTokenManager,
+        private UrlGeneratorInterface $urlGenerator,
+        private ClockInterface $clock,
+        private string $deliveryClass,
     ) {
     }
 
-    public function retryAction(Request $request, int $id): Response
+    public function retryAction(Request $request, int $id): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         $delivery = $this->find($id);
         if (!$this->isCsrfTokenValid($request, self::csrfTokenId($id))) {
@@ -56,7 +55,7 @@ final class WebhookDeliveryController
         return $this->toShow($request, $id, 'success', 'tmonier_webhook.retry_scheduled');
     }
 
-    public function replayAction(Request $request, int $id): Response
+    public function replayAction(Request $request, int $id): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         $delivery = $this->find($id);
         if (!$this->isCsrfTokenValid($request, self::csrfTokenId($id))) {
@@ -67,7 +66,7 @@ final class WebhookDeliveryController
             return $this->toShow($request, $id, 'error', 'tmonier_webhook.endpoint_disabled');
         }
         $replay = $this->replay($delivery);
-        if (null === $replay) {
+        if (!$replay instanceof \Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface) {
             return $this->toShow($request, $id, 'error', $delivery->getEvent()->isAnonymized() ? 'tmonier_webhook.cannot_replay_anonymized' : 'tmonier_webhook.cannot_replay');
         }
         $this->entityManager->flush();
@@ -75,7 +74,7 @@ final class WebhookDeliveryController
         return $this->toShow($request, (int) $replay->getId(), 'success', 'tmonier_webhook.replay_scheduled');
     }
 
-    public function bulkReplayAction(Request $request): Response
+    public function bulkReplayAction(Request $request): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         $index = $this->urlGenerator->generate('tmonier_webhook_admin_webhook_delivery_index');
         if (!$this->isCsrfTokenValid($request, self::BULK_TOKEN_ID)) {
@@ -94,7 +93,7 @@ final class WebhookDeliveryController
         $skipped = 0;
         foreach ($ids as $id) {
             $delivery = $this->repository->find($id);
-            if ($delivery instanceof WebhookDeliveryInterface && null !== $this->replay($delivery)) {
+            if ($delivery instanceof WebhookDeliveryInterface && $this->replay($delivery) instanceof \Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface) {
                 ++$replayed;
             } else {
                 ++$skipped;

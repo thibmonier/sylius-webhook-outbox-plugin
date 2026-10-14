@@ -8,11 +8,11 @@ use Sylius\Component\Core\Model\ProductVariantInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Outbox\LazyValue;
 
 /** Stock line of product_variant.stock_changed, version 1. */
-final class ProductVariantPayloadNormalizer
+final readonly class ProductVariantPayloadNormalizer
 {
     public const VERSION = 1;
 
-    public function __construct(private readonly AdminUrlGenerator $adminUrlGenerator)
+    public function __construct(private AdminUrlGenerator $adminUrlGenerator)
     {
     }
 
@@ -20,7 +20,7 @@ final class ProductVariantPayloadNormalizer
     public function normalizeStock(ProductVariantInterface $variant, ?int $previousOnHand, ?int $previousOnHold): array
     {
         $id = LazyValue::idOf($variant);
-        $productId = null === $variant->getProduct() ? null : LazyValue::idOf($variant->getProduct());
+        $productId = $variant->getProduct() instanceof \Sylius\Component\Product\Model\ProductInterface ? LazyValue::idOf($variant->getProduct()) : null;
         $onHand = (int) $variant->getOnHand();
         $onHold = (int) $variant->getOnHold();
 

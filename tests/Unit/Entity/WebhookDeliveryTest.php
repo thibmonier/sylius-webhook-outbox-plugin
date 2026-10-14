@@ -16,7 +16,7 @@ final class WebhookDeliveryTest extends TestCase
     public function testLifecycle(): void
     {
         $now = new \DateTimeImmutable('2026-10-11 10:00:00', new \DateTimeZone('UTC'));
-        $delivery = new WebhookDelivery(self::event(), new WebhookEndpoint(), $now);
+        $delivery = new WebhookDelivery($this->event(), new WebhookEndpoint(), $now);
 
         self::assertSame(WebhookDeliveryInterface::STATUS_PENDING, $delivery->getStatus());
         self::assertTrue($delivery->isDue($now));
@@ -49,7 +49,7 @@ final class WebhookDeliveryTest extends TestCase
     public function testHistoryKeepsTheLastAttempts(): void
     {
         $now = new \DateTimeImmutable();
-        $delivery = new WebhookDelivery(self::event(), new WebhookEndpoint(), $now);
+        $delivery = new WebhookDelivery($this->event(), new WebhookEndpoint(), $now);
         for ($i = 0; $i < 15; ++$i) {
             $delivery->recordAttempt(new DeliveryAttempt($now, $i, 500));
         }
@@ -61,7 +61,7 @@ final class WebhookDeliveryTest extends TestCase
 
     public function testAnonymizedEventsCannotBeReplayed(): void
     {
-        $event = self::event();
+        $event = $this->event();
         $delivery = new WebhookDelivery($event, new WebhookEndpoint(), new \DateTimeImmutable());
         $delivery->markDead();
         self::assertTrue($delivery->canBeReplayed());
@@ -95,7 +95,7 @@ final class WebhookDeliveryTest extends TestCase
         self::assertNull($endpoint->getDisabledReason());
     }
 
-    private static function event(): OutboxEvent
+    private function event(): OutboxEvent
     {
         return new OutboxEvent('order.paid', 1, new \DateTimeImmutable(), ['id' => 1]);
     }

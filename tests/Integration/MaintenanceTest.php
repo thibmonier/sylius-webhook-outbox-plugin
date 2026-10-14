@@ -42,7 +42,7 @@ final class MaintenanceTest extends KernelTestCase
         $this->receiver()->queue(new MockResponse('{"received":"ada@example.com"}', ['http_code' => 200]));
         $dispatcher = self::getContainer()->get('tmonier_webhook.dispatcher');
         self::assertInstanceOf(WebhookDispatcher::class, $dispatcher);
-        while (null !== $dispatcher->dispatchNext()) {
+        while ($dispatcher->dispatchNext() instanceof \Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookDeliveryInterface) {
         }
 
         $tester = $this->command('tmonier:webhook:anonymize-customer');
