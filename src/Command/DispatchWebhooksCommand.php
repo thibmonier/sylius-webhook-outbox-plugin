@@ -53,7 +53,7 @@ final class DispatchWebhooksCommand extends Command implements SignalableCommand
 
     public function getSubscribedSignals(): array
     {
-        return \defined('SIGTERM') ? [SIGTERM, SIGINT] : [];
+        return \defined('SIGTERM') ? [\SIGTERM, \SIGINT] : [];
     }
 
     public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
