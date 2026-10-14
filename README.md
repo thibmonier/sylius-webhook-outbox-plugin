@@ -36,7 +36,13 @@ Twig Hooks; MySQL 8, MariaDB 10.6+ and PostgreSQL support.
 
 ## Screenshots
 
-Screenshots go in `docs/images/`.
+![Webhook endpoints list in the Sylius admin with subscribed events, enabled and disabled endpoints, ping and secret regeneration actions](docs/images/admin-webhook-endpoints.jpg)
+
+![Webhook deliveries list showing delivered, failed with retry scheduled, pending and dead deliveries with HTTP status and next attempt](docs/images/admin-webhook-deliveries.jpg)
+
+![Dead-lettered delivery detail with the last response excerpt, the full attempt history and the Replay button](docs/images/admin-webhook-delivery-detail.jpg)
+
+![Webhook endpoint form with URL, subscribed events, channels and signing secret actions](docs/images/admin-webhook-endpoint-form.jpg)
 
 ## Requirements
 
