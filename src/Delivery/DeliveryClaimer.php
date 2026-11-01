@@ -37,8 +37,6 @@ final class DeliveryClaimer
 
     private ?bool $skipLockedSupported = null;
 
-    private ?float $lastReconciliation = null;
-
     /**
      * @param class-string<WebhookDeliveryInterface> $deliveryClass
      * @param class-string<WebhookEndpointInterface> $endpointClass
@@ -46,10 +44,10 @@ final class DeliveryClaimer
     public function __construct(
         private readonly ManagerRegistry $registry,
         private readonly ClockInterface $clock,
+        private readonly EndpointStateReconciler $reconciler,
         private readonly string $deliveryClass,
         private readonly string $endpointClass,
         private readonly int $leaseSeconds,
-        private readonly float $reconcileInterval = 30,
     ) {
     }
 
@@ -58,15 +56,13 @@ final class DeliveryClaimer
         return $this->claimOn($this->entityManager()->getConnection());
     }
 
-    /** Claims with the given connection (a second worker in the tests). */
     public function claimOn(Connection $connection): ?DeliveryClaim
     {
         $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
         $table = $this->deliveryTable();
 
-        $this->reconcileIfDue($connection);
+        $this->reconciler->reconcileIfDue($connection);
 
-        // Separate query: locking a join would lock the endpoint rows too.
         $endpointIds = array_map(
             static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0,
             $connection->createQueryBuilder()
@@ -118,10 +114,6 @@ final class DeliveryClaimer
         return null;
     }
 
-    /**
-     * True when the claim still belongs to the caller; locks the row until the end of the
-     * current transaction.
-     */
     public function holds(DeliveryClaim $claim): bool
     {
         $query = $this->entityManager()->getConnection()->createQueryBuilder()
@@ -135,94 +127,6 @@ final class DeliveryClaimer
         return $claim->token === $query->executeQuery()->fetchOne();
     }
 
-    /**
-     * Self-healing, both ways, so that the state always converges whatever the races:
-     *  - open deliveries of a disabled endpoint are suspended (a flush that read the endpoint
-     *    as enabled before it was disabled may still fan out to it);
-     *  - suspended deliveries of an enabled endpoint are requeued (a suspension racing with a
-     *    re-enable).
-     * The endpoint state is re-checked inside each UPDATE (subquery), never trusted from the
-     * earlier read, and a delivery with a live claim is never touched. Every statement goes
-     * through an index: the endpoint table is tiny, deliveries are reached through
-     * (endpoint_id, status) or (status, ...).
-     *
-     * @return int number of deliveries changed
-     */
-    public function reconcileEndpointStates(?Connection $connection = null): int
-    {
-        $connection ??= $this->entityManager()->getConnection();
-        $this->lastReconciliation = microtime(true);
-        $table = $this->deliveryTable();
-        $endpointTable = $this->entityManager()->getClassMetadata($this->endpointClass)->getTableName();
-        $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
-        $changed = 0;
-
-        $disabled = $this->ids($connection->fetchFirstColumn(sprintf('SELECT id FROM %s WHERE enabled = ?', $endpointTable), [false], [ParameterType::BOOLEAN]));
-        // Each UPDATE only runs after a plain indexed read found candidates: an UPDATE matching
-        // nothing would still hold gap locks that block the checkout inserts.
-        if ([] !== $disabled && $this->exists($connection, $table, $disabled, self::OPEN_STATUSES)) {
-            $changed += (int) $connection->executeStatement(
-                sprintf(
-                    'UPDATE %1$s SET status = ?, next_attempt_at = NULL, claimed_until = NULL, claim_token = NULL WHERE endpoint_id IN (?) AND status IN (?) AND (claimed_until IS NULL OR claimed_until < ?) AND endpoint_id IN (SELECT id FROM %2$s WHERE enabled = ?)',
-                    $table,
-                    $endpointTable,
-                ),
-                [WebhookDeliveryInterface::STATUS_SUSPENDED, $disabled, self::OPEN_STATUSES, $now, false],
-                [ParameterType::STRING, ArrayParameterType::INTEGER, ArrayParameterType::STRING, Types::DATETIME_IMMUTABLE, ParameterType::BOOLEAN],
-            );
-        }
-
-        $enabled = $this->ids($connection->fetchFirstColumn(sprintf('SELECT id FROM %s WHERE enabled = ?', $endpointTable), [true], [ParameterType::BOOLEAN]));
-        if ([] !== $enabled && $this->exists($connection, $table, $enabled, [WebhookDeliveryInterface::STATUS_SUSPENDED])) {
-            $changed += (int) $connection->executeStatement(
-                sprintf(
-                    'UPDATE %1$s SET status = ?, next_attempt_at = ? WHERE endpoint_id IN (?) AND status = ? AND endpoint_id IN (SELECT id FROM %2$s WHERE enabled = ?)',
-                    $table,
-                    $endpointTable,
-                ),
-                [WebhookDeliveryInterface::STATUS_PENDING, $now, $enabled, WebhookDeliveryInterface::STATUS_SUSPENDED, true],
-                [ParameterType::STRING, Types::DATETIME_IMMUTABLE, ArrayParameterType::INTEGER, ParameterType::STRING, ParameterType::BOOLEAN],
-            );
-        }
-
-        return $changed;
-    }
-
-    /** Reconciles at most every reconcile_interval seconds per worker (claims call it). */
-    public function reconcileIfDue(?Connection $connection = null): bool
-    {
-        if (null !== $this->lastReconciliation && microtime(true) - $this->lastReconciliation < $this->reconcileInterval) {
-            return false;
-        }
-        $this->reconcileEndpointStates($connection);
-
-        return true;
-    }
-
-    /**
-     * @param list<int> $endpointIds
-     * @param list<string> $statuses
-     */
-    private function exists(Connection $connection, string $table, array $endpointIds, array $statuses): bool
-    {
-        return false !== $connection->fetchOne(
-            $connection->getDatabasePlatform()->modifyLimitQuery(sprintf('SELECT id FROM %s WHERE endpoint_id IN (?) AND status IN (?)', $table), 1),
-            [$endpointIds, $statuses],
-            [ArrayParameterType::INTEGER, ArrayParameterType::STRING],
-        );
-    }
-
-    /**
-     * @param list<mixed> $values
-     *
-     * @return list<int>
-     */
-    private function ids(array $values): array
-    {
-        return array_map(static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0, $values);
-    }
-
-    /** Gives a claimed delivery back (the attempt could not be recorded). */
     public function release(DeliveryClaim $claim): void
     {
         $this->entityManager()->getConnection()->update(
@@ -241,12 +145,29 @@ final class DeliveryClaimer
                 $query->forUpdate(ConflictResolutionMode::SKIP_LOCKED)->getSQL();
                 $this->skipLockedSupported = true;
             } catch (\Doctrine\DBAL\Exception) {
-                // Old platform (e.g. serverVersion pinned to MySQL 5.7): plain FOR UPDATE, one worker only.
                 $this->skipLockedSupported = false;
             }
         }
 
         return $this->skipLockedSupported;
+    }
+
+    /**
+     * Delegates to {@see EndpointStateReconciler::reconcileEndpointStates()}.
+     *
+     * @return int number of deliveries changed
+     */
+    public function reconcileEndpointStates(?Connection $connection = null): int
+    {
+        return $this->reconciler->reconcileEndpointStates($connection);
+    }
+
+    /**
+     * Delegates to {@see EndpointStateReconciler::reconcileIfDue()}.
+     */
+    public function reconcileIfDue(?Connection $connection = null): bool
+    {
+        return $this->reconciler->reconcileIfDue($connection);
     }
 
     /**

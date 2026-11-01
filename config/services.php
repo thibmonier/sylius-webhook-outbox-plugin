@@ -23,6 +23,7 @@ use Tmonier\SyliusWebhookOutboxPlugin\Command\AnonymizeCustomerWebhooksCommand;
 use Tmonier\SyliusWebhookOutboxPlugin\Command\DispatchWebhooksCommand;
 use Tmonier\SyliusWebhookOutboxPlugin\Command\PurgeWebhooksCommand;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\DeliveryClaimer;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\EndpointStateReconciler;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\HttpWebhookSender;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\RetryPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookDispatcher;
@@ -189,10 +190,20 @@ return static function (ContainerConfigurator $container): void {
     $services->alias(WebhookSenderInterface::class, 'tmonier_webhook.sender');
 
     $services
+        ->set('tmonier_webhook.endpoint_state_reconciler', EndpointStateReconciler::class)
+        ->args([
+            service('doctrine'),
+            service('clock'),
+            param('tmonier_webhook.model.webhook_delivery.class'),
+            param('tmonier_webhook.model.webhook_endpoint.class'),
+        ])
+    ;
+    $services
         ->set('tmonier_webhook.delivery_claimer', DeliveryClaimer::class)
         ->args([
             service('doctrine'),
             service('clock'),
+            service('tmonier_webhook.endpoint_state_reconciler'),
             param('tmonier_webhook.model.webhook_delivery.class'),
             param('tmonier_webhook.model.webhook_endpoint.class'),
             param('tmonier_webhook.claim_lease'),

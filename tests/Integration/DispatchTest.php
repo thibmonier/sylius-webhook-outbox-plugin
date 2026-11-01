@@ -16,6 +16,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 use Tests\Tmonier\SyliusWebhookOutboxPlugin\WebhookTestTrait;
 use Tmonier\SyliusWebhookOutboxPlugin\Command\DispatchWebhooksCommand;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\DeliveryClaimer;
+use Tmonier\SyliusWebhookOutboxPlugin\Delivery\EndpointStateReconciler;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\RetryPolicy;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookDispatcher;
 use Tmonier\SyliusWebhookOutboxPlugin\Delivery\WebhookRequest;
@@ -182,7 +183,8 @@ final class DispatchTest extends KernelTestCase
 
         $doctrine = self::getContainer()->get('doctrine');
         self::assertInstanceOf(ManagerRegistry::class, $doctrine);
-        $claimer = new DeliveryClaimer($doctrine, new NativeClock(), WebhookDelivery::class, WebhookEndpoint::class, 90, 3600);
+        $reconciler = new EndpointStateReconciler($doctrine, new NativeClock(), WebhookDelivery::class, WebhookEndpoint::class, 3600);
+        $claimer = new DeliveryClaimer($doctrine, new NativeClock(), $reconciler, WebhookDelivery::class, WebhookEndpoint::class, 90);
 
         self::assertNull($claimer->claimNext());
         self::assertSame('suspended', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$first->getId()]), 'First claim: reconciled.');
@@ -193,7 +195,8 @@ final class DispatchTest extends KernelTestCase
         self::assertFalse($claimer->reconcileIfDue());
         self::assertSame('pending', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$second->getId()]));
 
-        $eager = new DeliveryClaimer($doctrine, new NativeClock(), WebhookDelivery::class, WebhookEndpoint::class, 90, 0);
+        $eagerReconciler = new EndpointStateReconciler($doctrine, new NativeClock(), WebhookDelivery::class, WebhookEndpoint::class, 0);
+        $eager = new DeliveryClaimer($doctrine, new NativeClock(), $eagerReconciler, WebhookDelivery::class, WebhookEndpoint::class, 90);
         self::assertTrue($eager->reconcileIfDue());
         self::assertSame('suspended', $this->connection()->fetchOne('SELECT status FROM tmonier_webhook_delivery WHERE id = ?', [$second->getId()]));
     }
