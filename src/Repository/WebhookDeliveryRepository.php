@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tmonier\SyliusWebhookOutboxPlugin\Repository;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\QueryBuilder;
 use Sylius\Bundle\ResourceBundle\Doctrine\ORM\EntityRepository;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\OutboxEventInterface;
@@ -60,11 +61,28 @@ class WebhookDeliveryRepository extends EntityRepository implements WebhookDeliv
 
     public function oldestPendingDueAt(\DateTimeImmutable $now): ?\DateTimeImmutable
     {
-        return null;
+        $oldest = $this->createQueryBuilder('o')
+            ->select('MIN(o.nextAttemptAt)')
+            ->andWhere('o.status = :status')
+            ->andWhere('o.nextAttemptAt <= :now')
+            ->setParameter('status', WebhookDeliveryInterface::STATUS_PENDING)
+            ->setParameter('now', $now->setTimezone(new \DateTimeZone('UTC')), Types::DATETIME_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult()
+        ;
+
+        return is_string($oldest) ? new \DateTimeImmutable($oldest, new \DateTimeZone('UTC')) : null;
     }
 
     public function countDeadUpTo(int $limit): int
     {
-        return 0;
+        // The ids only, at most $limit of them, along the "status, next_attempt_at, id" index: the table is never counted whole.
+        return count($this->createQueryBuilder('o')
+            ->select('o.id')
+            ->andWhere('o.status = :status')
+            ->setParameter('status', WebhookDeliveryInterface::STATUS_DEAD)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult());
     }
 }

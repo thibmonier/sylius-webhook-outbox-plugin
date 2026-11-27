@@ -1,4 +1,11 @@
 tmonier_webhook:
+    health:
+        backlog:
+            ok: "Webhook-leveringen worden op tijd verstuurd."
+            late: "De oudste verschuldigde webhook-levering wacht al %minutes% min: controleer of de dispatcher (tmonier:webhook:dispatch) draait."
+        dead:
+            ok: "Geen definitief mislukte webhook-levering en geen automatisch uitgeschakeld eindpunt."
+            found: "%dead% definitief mislukte webhook-leveringen en %disabled% automatisch uitgeschakelde eindpunten: herstel en verstuur opnieuw."
     ui:
         integrations: "Integraties"
         webhook_endpoints: "Webhook-endpoints"

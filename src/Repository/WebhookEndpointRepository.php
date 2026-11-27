@@ -29,6 +29,15 @@ class WebhookEndpointRepository extends EntityRepository implements WebhookEndpo
 
     public function countDisabledAutomatically(): int
     {
-        return 0;
+        $count = $this->createQueryBuilder('o')
+            ->select('COUNT(o.id)')
+            ->andWhere('o.enabled = :enabled')
+            ->andWhere('o.disabledAt IS NOT NULL')
+            ->setParameter('enabled', false)
+            ->getQuery()
+            ->getSingleScalarResult()
+        ;
+
+        return is_numeric($count) ? (int) $count : 0;
     }
 }

@@ -1,4 +1,11 @@
 tmonier_webhook:
+    health:
+        backlog:
+            ok: "Webhook deliveries are sent on time."
+            late: "The oldest due webhook delivery has been waiting for %minutes% min: check that the dispatcher (tmonier:webhook:dispatch) is running."
+        dead:
+            ok: "No dead webhook delivery and no endpoint disabled automatically."
+            found: "%dead% dead webhook deliveries and %disabled% endpoints disabled automatically: fix and replay them."
     ui:
         integrations: "Integrations"
         webhook_endpoints: "Webhook endpoints"
