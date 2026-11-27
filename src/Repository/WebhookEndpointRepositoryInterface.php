@@ -18,4 +18,9 @@ interface WebhookEndpointRepositoryInterface extends RepositoryInterface
      * @return list<WebhookEndpointInterface>
      */
     public function findSubscribed(string $eventType, ?string $channelCode): array;
+
+    /**
+     * Endpoints that the plugin disabled by itself (a "410 Gone" answer): disabled, with a date of disabling.
+     */
+    public function countDisabledAutomatically(): int;
 }

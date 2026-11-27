@@ -26,4 +26,9 @@ class WebhookEndpointRepository extends EntityRepository implements WebhookEndpo
             static fn (WebhookEndpointInterface $endpoint): bool => $endpoint->isSubscribedTo($eventType) && $endpoint->acceptsChannel($channelCode),
         ));
     }
+
+    public function countDisabledAutomatically(): int
+    {
+        return 0;
+    }
 }

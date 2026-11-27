@@ -10,12 +10,24 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Tmonier\SyliusPlatformHealthPlugin\Health\HealthCheckInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Capture\ChangeDetectorInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\EventType\EventTypeProviderInterface;
 
 final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtension implements PrependExtensionInterface
 {
     use PrependDoctrineMigrationsTrait;
+
+    /** @var \Closure(string): bool */
+    private readonly \Closure $interfaceExists;
+
+    /**
+     * @param (\Closure(string): bool)|null $interfaceExists
+     */
+    public function __construct(?\Closure $interfaceExists = null)
+    {
+        $this->interfaceExists = $interfaceExists ?? interface_exists(...);
+    }
 
     public function getAlias(): string
     {
@@ -47,6 +59,11 @@ final class TmonierSyliusWebhookOutboxExtension extends AbstractResourceExtensio
 
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.php');
+
+        // HealthCheckInterface::class is only a string here: it does not load the interface, so a shop without the health plugin never hits a fatal error.
+        if (($this->interfaceExists)(HealthCheckInterface::class)) {
+            $loader->load('health_checks.php');
+        }
     }
 
     public function prepend(ContainerBuilder $container): void

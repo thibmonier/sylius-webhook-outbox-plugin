@@ -54,6 +54,15 @@ final class TranslationsTest extends TestCase
         }
     }
 
+    public function testEveryHealthMessageIsTranslated(): void
+    {
+        $messages = $this->flatten($this->parse('messages', 'en'));
+
+        foreach (['backlog.ok', 'backlog.late', 'dead.ok', 'dead.found'] as $key) {
+            self::assertArrayHasKey('tmonier_webhook.health.' . $key, $messages);
+        }
+    }
+
     public function testEveryUrlViolationHasAMessage(): void
     {
         $validators = $this->flatten($this->parse('validators', 'en'));

@@ -57,4 +57,14 @@ class WebhookDeliveryRepository extends EntityRepository implements WebhookDeliv
 
         return $counts;
     }
+
+    public function oldestPendingDueAt(\DateTimeImmutable $now): ?\DateTimeImmutable
+    {
+        return null;
+    }
+
+    public function countDeadUpTo(int $limit): int
+    {
+        return 0;
+    }
 }

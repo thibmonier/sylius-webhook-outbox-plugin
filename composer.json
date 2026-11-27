@@ -39,7 +39,11 @@
         "symfony/intl": "^6.4 || ^7.4 || ^8.0",
         "symfony/runtime": "^6.4 || ^7.4 || ^8.0",
         "symfony/web-profiler-bundle": "^6.4 || ^7.4 || ^8.0",
-        "symfony/webpack-encore-bundle": "^2.2"
+        "symfony/webpack-encore-bundle": "^2.2",
+        "tmonier/sylius-platform-health-plugin": "^0.5"
+    },
+    "suggest": {
+        "tmonier/sylius-platform-health-plugin": "Shows the health probes of this plugin (webhook backlog, dead deliveries) on the administration page and dashboard"
     },
     "config": {
         "sort-packages": true,
