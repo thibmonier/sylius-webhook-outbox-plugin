@@ -6,8 +6,10 @@ namespace Tmonier\SyliusWebhookOutboxPlugin;
 
 use Sylius\Bundle\CoreBundle\Application\SyliusPluginTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Symfony\Component\VarDumper\Cloner\AbstractCloner;
+use Tmonier\SyliusWebhookOutboxPlugin\DependencyInjection\TmonierSyliusWebhookOutboxExtension;
 use Tmonier\SyliusWebhookOutboxPlugin\Entity\WebhookEndpointInterface;
 use Tmonier\SyliusWebhookOutboxPlugin\Http\UrlRedactor;
 use Tmonier\SyliusWebhookOutboxPlugin\VarDumper\WebhookEndpointCaster;
@@ -15,6 +17,15 @@ use Tmonier\SyliusWebhookOutboxPlugin\VarDumper\WebhookEndpointCaster;
 final class TmonierSyliusWebhookOutboxPlugin extends Bundle
 {
     use SyliusPluginTrait;
+
+    /**
+     * @param (\Closure(string): bool)|null $interfaceExists answers "does this interface exist?", interface_exists() by default;
+     *                                                       a test passes a closure that answers false to play a shop without the health plugin
+     */
+    public function __construct(
+        private readonly ?\Closure $interfaceExists = null,
+    ) {
+    }
 
     public function boot(): void
     {
@@ -27,6 +38,11 @@ final class TmonierSyliusWebhookOutboxPlugin extends Bundle
         if (class_exists(AbstractCloner::class)) {
             AbstractCloner::$defaultCasters[WebhookEndpointInterface::class] = WebhookEndpointCaster::cast(...);
         }
+    }
+
+    protected function createContainerExtension(): ExtensionInterface
+    {
+        return new TmonierSyliusWebhookOutboxExtension($this->interfaceExists);
     }
 
     public function getPath(): string

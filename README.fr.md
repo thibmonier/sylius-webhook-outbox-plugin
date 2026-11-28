@@ -408,6 +408,19 @@ vraie version (`8.4.0`, `mariadb-11.4.0`, `17`).
 | `tmonier:webhook:purge [--days=N] [--dry-run]` | supprime les événements plus anciens que N jours (par défaut `retention_days`) avec leurs envois ; les événements dont un envoi est encore en attente ou en échec sont conservés |
 | `tmonier:webhook:anonymize-customer <id or e-mail>` | masque les données personnelles des événements du client (payloads) et supprime les extraits de réponse de ses envois |
 
+## Sondes de santé
+
+Si [`tmonier/sylius-platform-health-plugin`](https://github.com/thibmonier/sylius-platform-health-plugin) (`^0.5`) est installé, le plugin affiche deux sondes dans la catégorie **Plugins** de la page de santé, du tableau de bord et de `tmonier:health:check`. Le plugin de santé est seulement suggéré : sans lui, rien n'est chargé et rien ne change.
+
+| Identifiant | Mesure | `ok` | `warning` | `critical` |
+|---|---|---|---|---|
+| `webhook_outbox.backlog` | âge du plus ancien envoi `pending` dû : le dispatcher ne vide plus la boîte d'envoi | aucun, ou 15 min au plus | plus de 15 min, jusqu'à 60 min | plus de 60 min |
+| `webhook_outbox.dead_deliveries` | envois `dead` et points de terminaison désactivés automatiquement (après un `410 Gone`) | aucun des deux | au moins un envoi mort ou un point désactivé | sans objet |
+
+- Lecture seule, une requête agrégée par mesure sur les index existants, aucune entité chargée. Les envois morts sont comptés jusqu'à 500, au-delà le résumé indique « 500+ ».
+- Les résumés donnent un âge ou un nombre : jamais d'URL, de charge utile ni de secret. Chaque résultat qui n'est pas `ok` renvoie vers la grille des envois, les envois morts ou les points de terminaison.
+- Une sonde dont la requête échoue répond `unknown` (la cause va au journal, pas à la page).
+
 ## Endpoints désactivés
 
 Quand un endpoint est désactivé (par un administrateur ou après un `410 Gone`), ses envois en attente

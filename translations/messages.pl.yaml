@@ -1,4 +1,11 @@
 tmonier_webhook:
+    health:
+        backlog:
+            ok: "Dostarczanie webhooków odbywa się na czas."
+            late: "Najstarsza wymagalna dostawa webhooka czeka od %minutes% min: sprawdź, czy dispatcher (tmonier:webhook:dispatch) działa."
+        dead:
+            ok: "Brak martwych dostaw webhooków i brak automatycznie wyłączonych punktów końcowych."
+            found: "%dead% martwych dostaw webhooków i %disabled% automatycznie wyłączonych punktów końcowych: napraw je i wyślij ponownie."
     ui:
         integrations: "Integracje"
         webhook_endpoints: "Endpointy webhooków"

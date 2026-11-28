@@ -405,6 +405,19 @@ for each other: run a single worker, or set `server_version` to your real versio
 | `tmonier:webhook:purge [--days=N] [--dry-run]` | deletes the events older than N days (default `retention_days`) with their deliveries; events with a delivery still pending or failed are kept |
 | `tmonier:webhook:anonymize-customer <id or e-mail>` | redacts the personal data of the customer's events (payloads) and removes the response excerpts of their deliveries |
 
+## Health probes
+
+If [`tmonier/sylius-platform-health-plugin`](https://github.com/thibmonier/sylius-platform-health-plugin) (`^0.5`) is installed, the plugin shows two probes in the **Plugins** category of the health page, the dashboard and `tmonier:health:check`. The health plugin is only suggested: without it nothing is loaded and nothing changes.
+
+| Identifier | Measures | `ok` | `warning` | `critical` |
+|---|---|---|---|---|
+| `webhook_outbox.backlog` | age of the oldest `pending` delivery that is due: the dispatcher no longer drains the outbox | none, or at most 15 min | more than 15 min, up to 60 min | more than 60 min |
+| `webhook_outbox.dead_deliveries` | `dead` deliveries and endpoints disabled automatically (after a `410 Gone`) | none of both | at least one dead delivery or one disabled endpoint | n/a |
+
+- Read-only, one aggregate query per measure on the existing indexes, no entity loaded. Dead deliveries are counted up to 500, beyond which the summary reads "500+".
+- The summaries give an age or a count: never a URL, a payload or a secret. Each non-`ok` result links to the deliveries grid, the dead letters or the endpoints.
+- A probe whose query fails answers `unknown` (the cause goes to the log, not to the page).
+
 ## Disabled endpoints
 
 When an endpoint is disabled (by an administrator or after `410 Gone`), its pending and failed
