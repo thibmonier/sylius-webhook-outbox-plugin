@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-28
+
 - Health probes for the [platform health plugin](https://github.com/thibmonier/sylius-platform-health-plugin):
   `webhook_outbox.backlog` (age of the oldest due pending delivery: warning above 15 minutes, critical above 60)
   and `webhook_outbox.dead_deliveries` (dead deliveries and endpoints disabled automatically). The health plugin is
